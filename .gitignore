@@ -1,0 +1,15 @@
+# Godot
+.godot/
+*.translation
+export.cfg
+export_presets.cfg
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+*.tmp
+.godot_path.txt
+
+# Secrets
+*.local.md
+credentials*
