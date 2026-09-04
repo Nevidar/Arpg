@@ -1,15 +1,9 @@
 extends Node2D
 
-## Акт 1 — зоны у деревни / лес / опушка. Волны пачек, золото, переход дальше.
+## Кампания: Акты 1–5, зоны, боссы, купец между актами.
 
 const PLAYER_SCENE := preload("res://scenes/player.tscn")
 const ENEMY_SCENE := preload("res://scenes/enemy.tscn")
-
-const ZONES := [
-	{"id": "a1_edge", "name": "Окрайна деревни", "ilvl": 1, "packs": 3, "flavor": "Туман ползёт от леса. Навь ещё далеко — но уже близко."},
-	{"id": "a1_forest", "name": "Тёмный бор", "ilvl": 2, "packs": 4, "flavor": "Стволы как рёбра. Что-то смотрит между ними."},
-	{"id": "a1_mire", "name": "Гнилая опушка", "ilvl": 3, "packs": 4, "flavor": "Земля чавкает. Здесь кончается первая тропа Акта 1."},
-]
 
 @onready var _world: Node2D = $World
 @onready var _spawn_points: Node2D = $SpawnPoints
@@ -23,6 +17,7 @@ const ZONES := [
 @onready var _floor: ColorRect = $Floor
 @onready var _background: ColorRect = $Background
 
+var _zones: Array = []
 var player: CharacterBody2D
 var inventory_ui: InventoryUI
 var _zone_index: int = 0
@@ -33,12 +28,13 @@ var _zone_clear: bool = false
 var _portal: Area2D
 var _flavor_label: Label
 var _gold_label: Label
+var _act_label: Label
 var _merchant: Node2D
-var _merchant_open: bool = false
 
 
 func _ready() -> void:
-	_hint_label.text = "WASD бой | I/Tab инвентарь | Q/E навыки | Пробел рывок | F1-F8 пассивки | R рестарт"
+	_zones = Campaign.zones()
+	_hint_label.text = "WASD бой | I инвентарь | Q/E навыки | Пробел рывок | F1-F8 пассивки | N/G портал | F9 следующая зона | R рестарт"
 	_ensure_extra_labels()
 	_spawn_player()
 	_enter_zone(0)
@@ -51,9 +47,17 @@ func _ensure_extra_labels() -> void:
 	_gold_label.add_theme_font_size_override("font_size", 16)
 	_hud_root.add_child(_gold_label)
 
+	_act_label = Label.new()
+	_act_label.position = Vector2(400, 12)
+	_act_label.size = Vector2(560, 28)
+	_act_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_act_label.add_theme_font_size_override("font_size", 16)
+	_act_label.modulate = Color(0.85, 0.75, 0.55)
+	_hud_root.add_child(_act_label)
+
 	_flavor_label = Label.new()
 	_flavor_label.position = Vector2(16, 620)
-	_flavor_label.size = Vector2(860, 40)
+	_flavor_label.size = Vector2(900, 40)
 	_flavor_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_flavor_label.add_theme_font_size_override("font_size", 13)
 	_flavor_label.modulate = Color(0.75, 0.7, 0.65)
@@ -76,7 +80,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				inventory_ui.toggle()
 				player.inventory_open = inventory_ui.visible
 				get_viewport().set_input_as_handled()
-		elif event.keycode == KEY_G and _zone_clear:
+		elif (event.keycode == KEY_G or event.keycode == KEY_N) and _zone_clear:
+			_go_next_zone()
+		elif event.keycode == KEY_F9:
+			# Быстрый просмотр актов: сразу в следующую зону.
 			_go_next_zone()
 		elif event.keycode == KEY_E:
 			_try_merchant_buy()
@@ -98,7 +105,6 @@ func _spawn_player() -> void:
 	inventory_ui.setup(player)
 	inventory_ui.closed.connect(func() -> void: player.inventory_open = false)
 
-	# Стартовые свитки, чтобы сразу пощупать крафт
 	player.inventory.add(ItemData.make_scroll(&"transmute", "Свиток заговора", ""))
 	player.inventory.add(ItemData.make_scroll(&"augment", "Свиток уз", ""))
 	player.add_gold(25)
@@ -110,37 +116,35 @@ func _spawn_player() -> void:
 	_on_gold(player.gold)
 
 
+func _current_zone() -> Dictionary:
+	return _zones[_zone_index]
+
+
 func _enter_zone(index: int) -> void:
-	_zone_index = clampi(index, 0, ZONES.size() - 1)
+	_zone_index = clampi(index, 0, _zones.size() - 1)
 	_pack = 1
 	_zone_clear = false
-	_clear_enemies_and_portal()
-	var z: Dictionary = ZONES[_zone_index]
-	_wave_label.text = "Акт 1 — %s | Пачка %d/%d" % [z["name"], _pack, z["packs"]]
+	_clear_world_props()
+	var z: Dictionary = _current_zone()
+	_act_label.text = Campaign.act_title(int(z["act"]))
+	_wave_label.text = "%s | Пачка %d/%d" % [z["name"], _pack, z["packs"]]
 	_flavor_label.text = z["flavor"]
-	_apply_zone_visuals(_zone_index)
+	_background.color = z["bg"]
+	_floor.color = z["floor"]
+	FloatingText.spawn(self, Vector2(640, 280), Campaign.act_title(int(z["act"])), Color(0.9, 0.8, 0.5), true)
 	_spawn_pack()
 
 
-func _apply_zone_visuals(index: int) -> void:
-	match index:
-		0:
-			_background.color = Color(0.08, 0.09, 0.1)
-			_floor.color = Color(0.16, 0.18, 0.14)
-		1:
-			_background.color = Color(0.05, 0.07, 0.06)
-			_floor.color = Color(0.1, 0.14, 0.11)
-		_:
-			_background.color = Color(0.07, 0.06, 0.08)
-			_floor.color = Color(0.14, 0.12, 0.1)
-
-
-func _clear_enemies_and_portal() -> void:
+func _clear_world_props() -> void:
 	for n in _world.get_children():
-		if n.is_in_group("enemies") or n.has_meta("portal"):
+		if n == player:
+			continue
+		if n.is_in_group("enemies") or n.has_meta("portal") or n.has_meta("merchant") or n.has_meta("item") or n.has_meta("gold"):
 			n.queue_free()
+	_loot_nodes.clear()
 	_alive_enemies = 0
 	_portal = null
+	_merchant = null
 
 
 func _on_player_hp(current: float, maximum: float) -> void:
@@ -152,7 +156,7 @@ func _on_gold(amount: int) -> void:
 
 
 func _on_player_died() -> void:
-	_hint_label.text = "Ты пал. R — начать зону заново."
+	_hint_label.text = "Ты пал. R — начать кампанию заново."
 
 
 func _refresh_stats() -> void:
@@ -175,8 +179,32 @@ func _refresh_passives() -> void:
 
 
 func _spawn_pack() -> void:
-	var z: Dictionary = ZONES[_zone_index]
-	_wave_label.text = "Акт 1 — %s | Пачка %d/%d" % [z["name"], _pack, z["packs"]]
+	var z: Dictionary = _current_zone()
+	var act: int = int(z["act"])
+	var ilvl: int = int(z["ilvl"])
+	_wave_label.text = "%s | Пачка %d/%d" % [z["name"], _pack, z["packs"]]
+
+	var is_boss_pack := bool(z["boss"]) and _pack >= int(z["packs"])
+	if is_boss_pack:
+		_wave_label.text = "%s | БОСС: %s" % [z["name"], z["boss_name"]]
+		var boss: CharacterBody2D = ENEMY_SCENE.instantiate()
+		_world.add_child(boss)
+		boss.global_position = Vector2(640, 200)
+		boss.setup(player, Enemy.EnemyKind.BOSS)
+		_scale_enemy(boss, ilvl, act, true)
+		boss.died.connect(_on_enemy_died)
+		_alive_enemies += 1
+		for i in 2:
+			var pt: Marker2D = _spawn_points.get_child(i)
+			var helper: CharacterBody2D = ENEMY_SCENE.instantiate()
+			_world.add_child(helper)
+			helper.global_position = pt.global_position
+			helper.setup(player, Enemy.EnemyKind.FAST if i == 0 else Enemy.EnemyKind.RANGED)
+			_scale_enemy(helper, ilvl, act, false)
+			helper.died.connect(_on_enemy_died)
+			_alive_enemies += 1
+		return
+
 	var kinds: Array = [
 		Enemy.EnemyKind.NORMAL,
 		Enemy.EnemyKind.NORMAL,
@@ -184,42 +212,30 @@ func _spawn_pack() -> void:
 		Enemy.EnemyKind.TANK,
 		Enemy.EnemyKind.RANGED,
 	]
-	# Босс на последней пачке последней зоны Акта 1
-	var is_boss_pack := _zone_index >= ZONES.size() - 1 and _pack >= int(z["packs"])
-	if is_boss_pack:
-		_wave_label.text = "Акт 1 — %s | БОСС: Лихо Одноглазое" % z["name"]
-		var boss: CharacterBody2D = ENEMY_SCENE.instantiate()
-		_world.add_child(boss)
-		boss.global_position = Vector2(640, 200)
-		boss.setup(player, Enemy.EnemyKind.BOSS)
-		boss.died.connect(_on_enemy_died)
-		_alive_enemies += 1
-		# пара помощников
-		for i in 2:
-			var pt: Marker2D = _spawn_points.get_child(i)
-			var helper: CharacterBody2D = ENEMY_SCENE.instantiate()
-			_world.add_child(helper)
-			helper.global_position = pt.global_position
-			helper.setup(player, Enemy.EnemyKind.FAST if i == 0 else Enemy.EnemyKind.RANGED)
-			helper.died.connect(_on_enemy_died)
-			_alive_enemies += 1
-		return
-
-	var count := mini(3 + _pack + _zone_index, 8)
+	var count := mini(3 + _pack + act, 8)
 	for i in count:
 		var pt: Marker2D = _spawn_points.get_child(i % _spawn_points.get_child_count())
 		var enemy: CharacterBody2D = ENEMY_SCENE.instantiate()
 		_world.add_child(enemy)
 		enemy.global_position = pt.global_position + Vector2(randf_range(-20, 20), randf_range(-20, 20))
 		var kind: int = kinds[i % kinds.size()]
-		if _pack >= 3 and i == 0:
+		if _pack >= 2 and i == 0:
 			kind = Enemy.EnemyKind.TANK
 		enemy.setup(player, kind)
-		enemy.stats.max_hp *= 1.0 + 0.25 * _zone_index
-		enemy.stats.hp = enemy.stats.max_hp
-		enemy.stats.base_damage *= 1.0 + 0.15 * _zone_index
+		_scale_enemy(enemy, ilvl, act, false)
 		enemy.died.connect(_on_enemy_died)
 		_alive_enemies += 1
+
+
+func _scale_enemy(enemy: CharacterBody2D, ilvl: int, act: int, is_boss: bool) -> void:
+	var mult_hp := 1.0 + 0.18 * float(ilvl - 1) + 0.1 * float(act - 1)
+	var mult_dmg := 1.0 + 0.12 * float(ilvl - 1) + 0.08 * float(act - 1)
+	if is_boss:
+		mult_hp *= 1.15
+		mult_dmg *= 1.1
+	enemy.stats.max_hp *= mult_hp
+	enemy.stats.hp = enemy.stats.max_hp
+	enemy.stats.base_damage *= mult_dmg
 
 
 func _on_enemy_died(enemy: Node) -> void:
@@ -231,14 +247,13 @@ func _on_enemy_died(enemy: Node) -> void:
 		var drop: ItemData = enemy.roll_drop()
 		if drop:
 			_spawn_loot(enemy.global_position, drop)
-		# Монетки почти всегда
 		_spawn_gold_pile(enemy.global_position, maxi(1, int(enemy.gold_reward() / 2)))
 	_refresh_stats()
 	if _alive_enemies <= 0 and player.stats.is_alive():
-		var z: Dictionary = ZONES[_zone_index]
+		var z: Dictionary = _current_zone()
 		if _pack < int(z["packs"]):
 			_pack += 1
-			await get_tree().create_timer(1.0).timeout
+			await get_tree().create_timer(0.9).timeout
 			_spawn_pack()
 		else:
 			_on_zone_cleared()
@@ -246,16 +261,26 @@ func _on_enemy_died(enemy: Node) -> void:
 
 func _on_zone_cleared() -> void:
 	_zone_clear = true
-	var z: Dictionary = ZONES[_zone_index]
-	_wave_label.text = "Акт 1 — %s | ЗАЧИЩЕНО" % z["name"]
-	if _zone_index >= ZONES.size() - 1:
-		_flavor_label.text = "Лихо пало. Купец ждёт у костра. E — купить свиток (30 золота)."
-		_hint_label.text = "Акт 1 пройден. Подойди к купцу (E) или R — сначала."
+	var z: Dictionary = _current_zone()
+	_wave_label.text = "%s | ЗАЧИЩЕНО" % z["name"]
+	var last := _zone_index >= _zones.size() - 1
+	var act_end := bool(z["boss"])
+
+	if last:
+		_flavor_label.text = "Морена пала. История (черновик) окончена — дальше будет эндгейм. Купец здесь. R — сначала."
+		_hint_label.text = "Кампания пройдена. E — купец. R — рестарт."
 		_spawn_merchant(Vector2(720, 360))
+		return
+
+	if act_end:
+		_flavor_label.text = "Акт %d завершён. Купец и портал в следующий акт." % int(z["act"])
+		_hint_label.text = "E — купец (свиток 30з). Портал / N / G — Акт %d." % (int(z["act"]) + 1)
+		_spawn_merchant(Vector2(560, 360))
+		_spawn_portal(Vector2(760, 360), "Акт %d →" % (int(z["act"]) + 1))
 	else:
-		_flavor_label.text = "Тропа открылась. Подойди к порталу или нажми G."
-		_hint_label.text = "Зона чиста. Портал / G — следующая зона."
-		_spawn_portal(Vector2(640, 360))
+		_flavor_label.text = "Тропа открылась дальше по Акту %d." % int(z["act"])
+		_hint_label.text = "Портал / N / G — следующая зона."
+		_spawn_portal(Vector2(640, 360), "ДАЛЬШЕ")
 
 
 func _spawn_merchant(pos: Vector2) -> void:
@@ -281,7 +306,7 @@ func _update_merchant_hint() -> void:
 	if _merchant == null or not is_instance_valid(_merchant) or player == null:
 		return
 	if player.global_position.distance_to(_merchant.global_position) < 50.0:
-		_hint_label.text = "Купец: E — свиток заговора/уз/алхимии за 30 золота (случайно)"
+		_hint_label.text = "Купец: E — случайный свиток за 30 золота"
 
 
 func _try_merchant_buy() -> void:
@@ -301,7 +326,7 @@ func _try_merchant_buy() -> void:
 		FloatingText.spawn(self, player.global_position, "Сумка полна", Color(1.0, 0.4, 0.4))
 
 
-func _spawn_portal(pos: Vector2) -> void:
+func _spawn_portal(pos: Vector2, label_text: String = "ПОРТАЛ") -> void:
 	if _portal and is_instance_valid(_portal):
 		_portal.queue_free()
 	_portal = Area2D.new()
@@ -313,13 +338,14 @@ func _spawn_portal(pos: Vector2) -> void:
 	shape.shape = circle
 	_portal.add_child(shape)
 	var vis := ColorRect.new()
-	vis.size = Vector2(48, 48)
-	vis.position = Vector2(-24, -24)
-	vis.color = Color(0.35, 0.75, 0.9, 0.75)
+	vis.size = Vector2(52, 52)
+	vis.position = Vector2(-26, -26)
+	vis.color = Color(0.35, 0.75, 0.9, 0.8)
 	_portal.add_child(vis)
 	var lab := Label.new()
-	lab.text = "ПОРТАЛ"
-	lab.position = Vector2(-28, -44)
+	lab.text = label_text
+	lab.position = Vector2(-36, -48)
+	lab.add_theme_font_size_override("font_size", 13)
 	_portal.add_child(lab)
 	_world.add_child(_portal)
 
@@ -327,12 +353,12 @@ func _spawn_portal(pos: Vector2) -> void:
 func _try_portal() -> void:
 	if not _zone_clear or _portal == null or not is_instance_valid(_portal):
 		return
-	if player.global_position.distance_to(_portal.global_position) < 40.0:
+	if player.global_position.distance_to(_portal.global_position) < 42.0:
 		_go_next_zone()
 
 
 func _go_next_zone() -> void:
-	if _zone_index >= ZONES.size() - 1:
+	if _zone_index >= _zones.size() - 1:
 		return
 	_enter_zone(_zone_index + 1)
 
