@@ -1,7 +1,7 @@
 class_name Enemy
 extends CharacterBody2D
 
-enum EnemyKind { NORMAL, FAST, TANK, RANGED }
+enum EnemyKind { NORMAL, FAST, TANK, RANGED, BOSS }
 
 signal died(enemy)
 
@@ -63,6 +63,15 @@ func _apply_kind() -> void:
 			stats.move_speed = 80.0
 			_body_color = Color(0.25, 0.45, 0.55)
 			scale = Vector2(0.95, 0.95)
+		EnemyKind.BOSS:
+			stats.max_hp = 420.0
+			stats.base_damage = 16.0
+			stats.move_speed = 70.0
+			stats.armor = 35.0
+			stats.resist_physical = 0.2
+			stats.block_chance = 0.1
+			_body_color = Color(0.45, 0.1, 0.15)
+			scale = Vector2(1.8, 1.8)
 
 
 func _physics_process(delta: float) -> void:
@@ -140,12 +149,16 @@ func xp_reward() -> int:
 			return 28
 		EnemyKind.RANGED:
 			return 16
+		EnemyKind.BOSS:
+			return 120
 		_:
 			return 10
 
 
 func gold_reward() -> int:
 	match kind:
+		EnemyKind.BOSS:
+			return randi_range(40, 70)
 		EnemyKind.TANK:
 			return randi_range(8, 18)
 		EnemyKind.RANGED:
@@ -166,17 +179,17 @@ func apply_damage(hit: Damage) -> void:
 	if not stats.is_alive():
 		return
 	if hit.result == Damage.HitResult.EVADED:
-		_spawn_float_text("мисс", Color(0.7, 0.7, 0.9))
+		FloatingText.spawn(self, global_position, "мисс", Color(0.7, 0.7, 0.9))
 		return
 	if hit.result == Damage.HitResult.BLOCKED:
-		_spawn_float_text("блок", Color(0.7, 0.7, 0.9))
+		FloatingText.spawn(self, global_position, "блок", Color(0.7, 0.7, 0.9))
 		return
 
 	stats.take_raw_hp(hit.amount)
 	_hit_flash = 0.1
 	if hit.knockback != Vector2.ZERO:
 		global_position += hit.knockback * 0.35
-	_spawn_float_text(str(int(round(hit.amount))), Color(1.0, 0.9, 0.3), hit.is_crit)
+	FloatingText.spawn(self, global_position, str(int(round(hit.amount))), Color(1.0, 0.9, 0.3), hit.is_crit)
 	_update_hp_bar()
 	if not stats.is_alive():
 		died.emit(self)
@@ -186,17 +199,3 @@ func apply_damage(hit: Damage) -> void:
 func _update_hp_bar() -> void:
 	var ratio := clampf(stats.hp / stats.max_hp, 0.0, 1.0)
 	_hp_bar.size.x = 28.0 * ratio
-
-
-func _spawn_float_text(text: String, color: Color, crit: bool = false) -> void:
-	var label := Label.new()
-	label.text = text if not crit else text + "!"
-	label.modulate = color
-	if crit:
-		label.scale = Vector2(1.35, 1.35)
-	label.global_position = global_position + Vector2(-8, -36)
-	get_tree().current_scene.add_child(label)
-	var tween := create_tween()
-	tween.tween_property(label, "global_position", label.global_position + Vector2(randf_range(-8, 8), -40), 0.5)
-	tween.parallel().tween_property(label, "modulate:a", 0.0, 0.5)
-	tween.tween_callback(label.queue_free)

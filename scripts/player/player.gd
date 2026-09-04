@@ -118,7 +118,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if code >= KEY_F1 and code <= KEY_F8 and not inventory_open:
 			if passives.try_buy(code - KEY_F1):
 				Sfx.play_level_up()
-				_spawn_float_text("Пассивка!", Color(0.7, 0.9, 0.4))
+				FloatingText.spawn(self, global_position, "Пассивка!", Color(0.7, 0.9, 0.4))
 
 
 func _start_dash() -> void:
@@ -211,14 +211,14 @@ func apply_damage(hit: Damage) -> void:
 	if _invuln > 0.0 or _dash_time > 0.0:
 		return
 	if hit.result == Damage.HitResult.EVADED or hit.result == Damage.HitResult.BLOCKED:
-		_spawn_float_text("блок" if hit.result == Damage.HitResult.BLOCKED else "мисс", Color(0.7, 0.7, 0.9))
+		FloatingText.spawn(self, global_position, "блок" if hit.result == Damage.HitResult.BLOCKED else "мисс", Color(0.7, 0.7, 0.9))
 		return
 	stats.take_raw_hp(hit.amount)
 	_hit_flash = 0.12
 	if hit.knockback != Vector2.ZERO:
 		velocity += hit.knockback
 	hp_changed.emit(stats.hp, stats.max_hp)
-	_spawn_float_text(str(int(round(hit.amount))), Color(1.0, 0.35, 0.35), hit.is_crit)
+	FloatingText.spawn(self, global_position, str(int(round(hit.amount))), Color(1.0, 0.35, 0.35), hit.is_crit)
 	Sfx.play_hurt()
 	shake(5.0, 0.12)
 	if not stats.is_alive():
@@ -231,16 +231,16 @@ func gain_xp(amount: int) -> void:
 
 
 func add_gold(amount: int) -> void:
-	gold += amount
+	gold = maxi(0, gold + amount)
 	gold_changed.emit(gold)
 	if amount > 0:
-		_spawn_float_text("+%d золота" % amount, Color(1.0, 0.85, 0.3))
+		FloatingText.spawn(self, global_position, "+%d золота" % amount, Color(1.0, 0.85, 0.3))
 
 
 func try_pickup(item: ItemData) -> bool:
 	if inventory.add(item):
 		Sfx.play_pickup()
-		_spawn_float_text(item.display_name, item.color)
+		FloatingText.spawn(self, global_position, item.display_name, item.color)
 		return true
 	return false
 
@@ -299,7 +299,7 @@ func _on_leveled_up(new_level: int) -> void:
 	_recompute_from_gear()
 	stats.hp = stats.max_hp
 	Sfx.play_level_up()
-	_spawn_float_text("Уровень %d!" % new_level, Color(0.95, 0.85, 0.3), true)
+	FloatingText.spawn(self, global_position, "Уровень %d!" % new_level, Color(0.95, 0.85, 0.3), true)
 	shake(7.0, 0.2)
 	hp_changed.emit(stats.hp, stats.max_hp)
 
@@ -350,27 +350,14 @@ func _spawn_hit_spark(pos: Vector2, crit: bool) -> void:
 	spark.size = Vector2(10, 10) if not crit else Vector2(16, 16)
 	spark.color = Color(1.0, 0.95, 0.5, 0.9) if not crit else Color(1.0, 0.6, 0.2, 1.0)
 	spark.global_position = pos + Vector2(-5, -5)
+	spark.z_index = 90
 	get_tree().current_scene.add_child(spark)
-	var tween := create_tween()
+	var tween := get_tree().create_tween()
+	tween.set_parallel(true)
 	tween.tween_property(spark, "modulate:a", 0.0, 0.18)
-	tween.parallel().tween_property(spark, "scale", Vector2(1.8, 1.8), 0.18)
+	tween.tween_property(spark, "scale", Vector2(1.8, 1.8), 0.18)
+	tween.set_parallel(false)
 	tween.tween_callback(spark.queue_free)
-
-
-func _spawn_float_text(text: String, color: Color, crit: bool = false) -> void:
-	var label := Label.new()
-	label.text = text
-	label.modulate = color
-	if crit:
-		label.scale = Vector2(1.4, 1.4)
-		if not text.ends_with("!"):
-			label.text = text + "!"
-	label.global_position = global_position + Vector2(-10, -40)
-	get_tree().current_scene.add_child(label)
-	var tween := create_tween()
-	tween.tween_property(label, "global_position", label.global_position + Vector2(0, -36), 0.55)
-	tween.parallel().tween_property(label, "modulate:a", 0.0, 0.55)
-	tween.tween_callback(label.queue_free)
 
 
 func revive_at(pos: Vector2) -> void:

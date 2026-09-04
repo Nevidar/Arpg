@@ -33,6 +33,8 @@ var _zone_clear: bool = false
 var _portal: Area2D
 var _flavor_label: Label
 var _gold_label: Label
+var _merchant: Node2D
+var _merchant_open: bool = false
 
 
 func _ready() -> void:
@@ -62,6 +64,7 @@ func _process(_delta: float) -> void:
 	if player and not player.inventory_open:
 		_try_pickup_loot()
 		_try_portal()
+		_update_merchant_hint()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -75,6 +78,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 		elif event.keycode == KEY_G and _zone_clear:
 			_go_next_zone()
+		elif event.keycode == KEY_E:
+			_try_merchant_buy()
 
 
 func _spawn_player() -> void:
@@ -179,6 +184,27 @@ func _spawn_pack() -> void:
 		Enemy.EnemyKind.TANK,
 		Enemy.EnemyKind.RANGED,
 	]
+	# Босс на последней пачке последней зоны Акта 1
+	var is_boss_pack := _zone_index >= ZONES.size() - 1 and _pack >= int(z["packs"])
+	if is_boss_pack:
+		_wave_label.text = "Акт 1 — %s | БОСС: Лихо Одноглазое" % z["name"]
+		var boss: CharacterBody2D = ENEMY_SCENE.instantiate()
+		_world.add_child(boss)
+		boss.global_position = Vector2(640, 200)
+		boss.setup(player, Enemy.EnemyKind.BOSS)
+		boss.died.connect(_on_enemy_died)
+		_alive_enemies += 1
+		# пара помощников
+		for i in 2:
+			var pt: Marker2D = _spawn_points.get_child(i)
+			var helper: CharacterBody2D = ENEMY_SCENE.instantiate()
+			_world.add_child(helper)
+			helper.global_position = pt.global_position
+			helper.setup(player, Enemy.EnemyKind.FAST if i == 0 else Enemy.EnemyKind.RANGED)
+			helper.died.connect(_on_enemy_died)
+			_alive_enemies += 1
+		return
+
 	var count := mini(3 + _pack + _zone_index, 8)
 	for i in count:
 		var pt: Marker2D = _spawn_points.get_child(i % _spawn_points.get_child_count())
@@ -189,7 +215,6 @@ func _spawn_pack() -> void:
 		if _pack >= 3 and i == 0:
 			kind = Enemy.EnemyKind.TANK
 		enemy.setup(player, kind)
-		# лёгкий скейл от зоны
 		enemy.stats.max_hp *= 1.0 + 0.25 * _zone_index
 		enemy.stats.hp = enemy.stats.max_hp
 		enemy.stats.base_damage *= 1.0 + 0.15 * _zone_index
@@ -224,12 +249,56 @@ func _on_zone_cleared() -> void:
 	var z: Dictionary = ZONES[_zone_index]
 	_wave_label.text = "Акт 1 — %s | ЗАЧИЩЕНО" % z["name"]
 	if _zone_index >= ZONES.size() - 1:
-		_flavor_label.text = "Конец черновика Акта 1. Дальше будут акты 2–5. Нажми R чтобы пройти снова."
-		_hint_label.text = "Акт 1 (черновик) пройден. R — сначала."
+		_flavor_label.text = "Лихо пало. Купец ждёт у костра. E — купить свиток (30 золота)."
+		_hint_label.text = "Акт 1 пройден. Подойди к купцу (E) или R — сначала."
+		_spawn_merchant(Vector2(720, 360))
 	else:
 		_flavor_label.text = "Тропа открылась. Подойди к порталу или нажми G."
 		_hint_label.text = "Зона чиста. Портал / G — следующая зона."
 		_spawn_portal(Vector2(640, 360))
+
+
+func _spawn_merchant(pos: Vector2) -> void:
+	if _merchant and is_instance_valid(_merchant):
+		_merchant.queue_free()
+	_merchant = Node2D.new()
+	_merchant.global_position = pos
+	_merchant.set_meta("merchant", true)
+	var body := ColorRect.new()
+	body.size = Vector2(28, 36)
+	body.position = Vector2(-14, -18)
+	body.color = Color(0.55, 0.4, 0.25)
+	_merchant.add_child(body)
+	var lab := Label.new()
+	lab.text = "Купец\nE: свиток 30з"
+	lab.position = Vector2(-40, -52)
+	lab.add_theme_font_size_override("font_size", 12)
+	_merchant.add_child(lab)
+	_world.add_child(_merchant)
+
+
+func _update_merchant_hint() -> void:
+	if _merchant == null or not is_instance_valid(_merchant) or player == null:
+		return
+	if player.global_position.distance_to(_merchant.global_position) < 50.0:
+		_hint_label.text = "Купец: E — свиток заговора/уз/алхимии за 30 золота (случайно)"
+
+
+func _try_merchant_buy() -> void:
+	if _merchant == null or not is_instance_valid(_merchant) or player == null:
+		return
+	if player.global_position.distance_to(_merchant.global_position) > 50.0:
+		return
+	if player.gold < 30:
+		FloatingText.spawn(self, player.global_position, "Мало золота", Color(1.0, 0.4, 0.4))
+		return
+	player.add_gold(-30)
+	var scroll := ItemData.roll_scroll()
+	if player.try_pickup(scroll):
+		FloatingText.spawn(self, player.global_position, "Куплено: " + scroll.display_name, Color(0.7, 0.5, 1.0))
+	else:
+		player.add_gold(30)
+		FloatingText.spawn(self, player.global_position, "Сумка полна", Color(1.0, 0.4, 0.4))
 
 
 func _spawn_portal(pos: Vector2) -> void:
