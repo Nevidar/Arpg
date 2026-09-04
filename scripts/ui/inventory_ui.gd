@@ -241,6 +241,9 @@ func _on_item_input(ev: InputEvent, entry: Dictionary) -> void:
 		_selected_bag = entry
 		# Свиток крафта: ПКМ применяет к выбранному ранее шмоту
 		if item.is_currency():
+			if item.is_map():
+				_spawn_float("Карта: открой устройство карт (M / E у алтаря)")
+				return
 			var target: ItemData = null
 			# если ранее выбран другой предмет — он цель; иначе ищем другой selected через drag
 			# цель: любой другой выбранный gear — храним _craft_target

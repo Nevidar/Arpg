@@ -7,6 +7,8 @@ extends RefCounted
 static func apply_scroll(scroll: ItemData, target: ItemData) -> String:
 	if scroll == null or target == null:
 		return "Нет цели"
+	if scroll.is_map() or String(scroll.craft_id) == "":
+		return "Это не свиток"
 	if target.is_currency():
 		return "Нельзя на свиток"
 	if not target.identified and String(scroll.craft_id) != "alchemy":

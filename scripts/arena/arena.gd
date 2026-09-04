@@ -1,21 +1,21 @@
 extends Node2D
 
-## Кампания: большие зоны в стиле PoE-черновика.
-## Вход слева → бой по пути → выход/портал справа.
+## Кампания + минимальный эндгейм (карты / моды / хаб).
 
 const PLAYER_SCENE := preload("res://scenes/player.tscn")
 const ENEMY_SCENE := preload("res://scenes/enemy.tscn")
 const CampaignData := preload("res://scripts/world/campaign.gd")
+const MapsData := preload("res://scripts/world/endgame_maps.gd")
 
-## Размер «карты» (позже можно варьировать по зонам).
 const MAP_W := 2800.0
 const MAP_H := 1700.0
 const MAP_ORIGIN := Vector2(80, 60)
+const HUB_W := 1200.0
+const HUB_H := 800.0
 const ENEMY_COUNT_MIN := 42
 const ENEMY_COUNT_MAX := 50
 
 @onready var _world: Node2D = $World
-@onready var _spawn_points: Node2D = $SpawnPoints
 @onready var _hud_root: Control = $HUD/Root
 @onready var _hp_label: Label = $HUD/Root/HpLabel
 @onready var _hint_label: Label = $HUD/Root/HintLabel
@@ -39,16 +39,27 @@ var _flavor_label: Label
 var _gold_label: Label
 var _act_label: Label
 var _merchant: Node2D
+var _map_device: Node2D
+var _map_panel: Control
+var _map_list: VBoxContainer
 var _map_rect: Rect2
 var _entry_pos: Vector2
 var _exit_pos: Vector2
 var _transitioning: bool = false
 
+var _run_mode: StringName = &"campaign" ## campaign | hub | map
+var _endgame_unlocked: bool = false
+var _active_map: Dictionary = {}
+var _active_mods: Array = []
+var _reward_gold_mult: float = 1.0
+var _reward_xp_mult: float = 1.0
+
 
 func _ready() -> void:
 	_zones = CampaignData.zones()
-	_hint_label.text = "WASD вперёд по карте | выход справа | I инвентарь | Q/E | Пробел | F9 skip | R рестарт"
+	_hint_label.text = "WASD | выход справа | I инвентарь | M карты | F9 зона | F10 хаб | R рестарт"
 	_ensure_extra_labels()
+	_build_map_panel()
 	_spawn_player()
 	_enter_zone(0)
 
@@ -77,18 +88,78 @@ func _ensure_extra_labels() -> void:
 	_hud_root.add_child(_flavor_label)
 
 
+func _build_map_panel() -> void:
+	_map_panel = Control.new()
+	_map_panel.visible = false
+	_map_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_map_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	_hud_root.add_child(_map_panel)
+
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.55)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_map_panel.add_child(dim)
+	dim.gui_input.connect(func(ev: InputEvent) -> void:
+		if ev is InputEventMouseButton and ev.pressed:
+			_close_map_panel()
+	)
+
+	var panel := PanelContainer.new()
+	panel.position = Vector2(360, 120)
+	panel.custom_minimum_size = Vector2(520, 420)
+	_map_panel.add_child(panel)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 14)
+	margin.add_theme_constant_override("margin_right", 14)
+	margin.add_theme_constant_override("margin_top", 12)
+	margin.add_theme_constant_override("margin_bottom", 12)
+	panel.add_child(margin)
+
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 8)
+	margin.add_child(col)
+
+	var title := Label.new()
+	title.text = "Устройство карт — эндгейм"
+	title.add_theme_font_size_override("font_size", 18)
+	col.add_child(title)
+
+	var hint := Label.new()
+	hint.text = "Выбери карту из сумки. На заходе накатятся 1–3 мода."
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	col.add_child(hint)
+
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(480, 280)
+	col.add_child(scroll)
+	_map_list = VBoxContainer.new()
+	_map_list.add_theme_constant_override("separation", 6)
+	scroll.add_child(_map_list)
+
+	var close_btn := Button.new()
+	close_btn.text = "Закрыть"
+	close_btn.pressed.connect(_close_map_panel)
+	col.add_child(close_btn)
+
+
 func _process(_delta: float) -> void:
 	if player and player.stats.is_alive():
 		_clamp_player()
-		if not player.inventory_open:
+		if not player.inventory_open and (_map_panel == null or not _map_panel.visible):
 			_try_pickup_loot()
 			_try_portal()
 			_update_merchant_hint()
+			_update_device_hint()
 			_try_edge_exit()
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_ESCAPE and _map_panel and _map_panel.visible:
+			_close_map_panel()
+			get_viewport().set_input_as_handled()
+			return
 		if event.keycode == KEY_R and (player == null or not player.inventory_open):
 			get_tree().reload_current_scene()
 		elif event.keycode == KEY_I or event.keycode == KEY_TAB:
@@ -96,12 +167,20 @@ func _unhandled_input(event: InputEvent) -> void:
 				inventory_ui.toggle()
 				player.inventory_open = inventory_ui.visible
 				get_viewport().set_input_as_handled()
+		elif event.keycode == KEY_M:
+			_try_open_map_device()
 		elif (event.keycode == KEY_G or event.keycode == KEY_N) and _zone_clear:
 			_go_next_zone()
 		elif event.keycode == KEY_F9:
-			_go_next_zone()
+			if _run_mode == &"campaign":
+				_go_next_zone()
+			elif _run_mode == &"map":
+				_enter_hub()
+		elif event.keycode == KEY_F10:
+			_force_unlock_endgame()
 		elif event.keycode == KEY_E:
-			_try_merchant_buy()
+			if not _try_merchant_buy():
+				_try_open_map_device(true)
 
 
 func _spawn_player() -> void:
@@ -134,11 +213,10 @@ func _current_zone() -> Dictionary:
 	return _zones[_zone_index]
 
 
-func _setup_map_geometry() -> void:
-	_map_rect = Rect2(MAP_ORIGIN, Vector2(MAP_W, MAP_H))
+func _setup_map_geometry(w: float = MAP_W, h: float = MAP_H) -> void:
+	_map_rect = Rect2(MAP_ORIGIN, Vector2(w, h))
 	_entry_pos = Vector2(_map_rect.position.x + 120.0, _map_rect.get_center().y)
 	_exit_pos = Vector2(_map_rect.end.x - 140.0, _map_rect.get_center().y)
-
 	var pad := 500.0
 	_background.polygon = [
 		Vector2(_map_rect.position.x - pad, _map_rect.position.y - pad),
@@ -155,6 +233,11 @@ func _setup_map_geometry() -> void:
 
 
 func _enter_zone(index: int) -> void:
+	_run_mode = &"campaign"
+	_active_mods.clear()
+	_active_map.clear()
+	_reward_gold_mult = 1.0
+	_reward_xp_mult = 1.0
 	_zone_index = clampi(index, 0, _zones.size() - 1)
 	_zone_clear = false
 	_transitioning = false
@@ -168,29 +251,98 @@ func _enter_zone(index: int) -> void:
 	if player:
 		player.global_position = _entry_pos
 		player.velocity = Vector2.ZERO
-	_spawn_zone_decor(z)
+	_spawn_zone_decor(int(z["act"]))
 	_spawn_exit_beacon()
-	_spawn_zone_enemies(z)
+	_spawn_zone_enemies(z, false)
 	_refresh_enemy_hud()
 	FloatingText.spawn(self, _entry_pos + Vector2(80, -60), CampaignData.act_title(int(z["act"])), Color(0.9, 0.8, 0.5), true)
-	_hint_label.text = "Иди вправо по карте. Выход откроется после зачистки."
+	_hint_label.text = "Иди вправо. Выход после зачистки. F10 — эндгейм."
+
+
+func _enter_hub() -> void:
+	_run_mode = &"hub"
+	_zone_clear = true
+	_transitioning = false
+	_active_mods.clear()
+	_active_map.clear()
+	_reward_gold_mult = 1.0
+	_reward_xp_mult = 1.0
+	_clear_world_props()
+	_setup_map_geometry(HUB_W, HUB_H)
+	_background.color = Color(0.12, 0.11, 0.14)
+	_floor.color = Color(0.28, 0.24, 0.2)
+	_act_label.text = "Хаб — эндгейм"
+	_flavor_label.text = "Алтарь карт ждёт. Клади карту — и снова в круг."
+	_wave_label.text = "Хаб | без врагов"
+	if player:
+		player.global_position = _map_rect.get_center()
+		player.velocity = Vector2.ZERO
+		player.stats.heal_full()
+		player.hp_changed.emit(player.stats.hp, player.stats.max_hp)
+	_spawn_zone_decor(0)
+	_spawn_merchant(_map_rect.get_center() + Vector2(-160, 40))
+	_spawn_map_device(_map_rect.get_center() + Vector2(160, 20))
+	_hint_label.text = "E / M у алтаря — выбрать карту. Купец слева."
+
+
+func _enter_endgame_map(map_item: ItemData) -> void:
+	var base: Dictionary = MapsData.base_by_id(map_item.map_id)
+	_active_map = base
+	_active_mods = MapsData.roll_map_mods(int(base["tier"]))
+	_reward_gold_mult = MapsData.gold_mult(_active_mods)
+	_reward_xp_mult = MapsData.xp_mult(_active_mods)
+	player.inventory.remove_item(map_item)
+	_refresh_inv()
+
+	_run_mode = &"map"
+	_zone_clear = false
+	_transitioning = false
+	_clear_world_props()
+	_setup_map_geometry()
+	_background.color = base["bg"]
+	_floor.color = base["floor"]
+	_act_label.text = "Карта T%d — %s" % [int(base["tier"]), base["name"]]
+	_flavor_label.text = "%s | Моды: %s" % [base["flavor"], MapsData.mods_label(_active_mods)]
+	if player:
+		player.global_position = _entry_pos
+		player.velocity = Vector2.ZERO
+	_spawn_zone_decor(int(base["tier"]) + 2)
+	_spawn_exit_beacon()
+	_spawn_zone_enemies(base, true)
+	_refresh_enemy_hud()
+	FloatingText.spawn(self, _entry_pos + Vector2(40, -50), base["name"], Color(0.5, 0.95, 0.7), true)
+	_hint_label.text = "Карта: зачисти и выйди справа / портал в хаб."
+
+
+func _force_unlock_endgame() -> void:
+	if not _endgame_unlocked:
+		_endgame_unlocked = true
+		_grant_starter_maps()
+		FloatingText.spawn(self, player.global_position, "Эндгейм открыт", Color(0.5, 1.0, 0.7), true)
+	_enter_hub()
+
+
+func _grant_starter_maps() -> void:
+	for b in MapsData.bases():
+		player.try_pickup(ItemData.make_map(b["id"], b["name"], int(b["tier"])))
+	_refresh_inv()
 
 
 func _clear_world_props() -> void:
 	for n in _world.get_children():
 		if n == player:
 			continue
-		if n.is_in_group("enemies") or n.has_meta("portal") or n.has_meta("merchant") or n.has_meta("item") or n.has_meta("gold") or n.has_meta("decor") or n.has_meta("exit"):
+		if n.is_in_group("enemies") or n.has_meta("portal") or n.has_meta("merchant") or n.has_meta("item") or n.has_meta("gold") or n.has_meta("decor") or n.has_meta("exit") or n.has_meta("device"):
 			n.queue_free()
 	_loot_nodes.clear()
 	_alive_enemies = 0
 	_portal = null
 	_merchant = null
 	_exit_marker = null
+	_map_device = null
 
 
-func _spawn_zone_decor(z: Dictionary) -> void:
-	var act: int = int(z["act"])
+func _spawn_zone_decor(act: int) -> void:
 	var accent := Color(0.45, 0.55, 0.3)
 	match act:
 		2:
@@ -201,7 +353,10 @@ func _spawn_zone_decor(z: Dictionary) -> void:
 			accent = Color(0.7, 0.55, 0.2)
 		5:
 			accent = Color(0.45, 0.55, 0.85)
-	for i in 28:
+		0:
+			accent = Color(0.55, 0.45, 0.35)
+	var count := 12 if _run_mode == &"hub" else 28
+	for i in count:
 		var p := Polygon2D.new()
 		p.set_meta("decor", true)
 		p.z_index = -5
@@ -213,10 +368,9 @@ func _spawn_zone_decor(z: Dictionary) -> void:
 			p.polygon = [Vector2(-s, 0), Vector2(-s * 0.3, -s * 0.45), Vector2(s * 0.7, -s * 0.2), Vector2(s, s * 0.2), Vector2(-s * 0.4, s * 0.35)]
 		else:
 			p.polygon = [Vector2(-s, -s), Vector2(s, -s), Vector2(s, s), Vector2(-s, s)]
-		# Разброс по карте, чуть ближе к краям (не блокирует тропу по центру).
-		var x := _map_rect.position.x + 180.0 + randf() * (MAP_W - 360.0)
+		var x := _map_rect.position.x + 180.0 + randf() * (_map_rect.size.x - 360.0)
 		var y_bias := -1.0 if i % 2 == 0 else 1.0
-		var y := _map_rect.get_center().y + y_bias * (180.0 + randf() * (MAP_H * 0.28))
+		var y := _map_rect.get_center().y + y_bias * (120.0 + randf() * (_map_rect.size.y * 0.25))
 		p.global_position = Vector2(x, clampf(y, _map_rect.position.y + 40.0, _map_rect.end.y - 40.0))
 		_world.add_child(p)
 
@@ -238,32 +392,33 @@ func _spawn_exit_beacon() -> void:
 	_world.add_child(_exit_marker)
 
 
-func _spawn_zone_enemies(z: Dictionary) -> void:
-	var act: int = int(z["act"])
+func _spawn_zone_enemies(z: Dictionary, is_map: bool) -> void:
+	var act_or_tier: int = int(z["tier"]) if is_map else int(z["act"])
 	var ilvl: int = int(z["ilvl"])
-	var is_boss_zone := bool(z["boss"])
+	var is_boss_zone := true if is_map else bool(z["boss"])
 	var count := randi_range(ENEMY_COUNT_MIN, ENEMY_COUNT_MAX)
-	if is_boss_zone:
+	if is_map:
+		count += int(z.get("enemy_bonus", 0)) + MapsData.sum_extra_enemies(_active_mods)
+	elif is_boss_zone:
 		count = randi_range(38, 45)
 
 	var kinds: Array = [
-		Enemy.EnemyKind.NORMAL,
-		Enemy.EnemyKind.NORMAL,
-		Enemy.EnemyKind.NORMAL,
-		Enemy.EnemyKind.FAST,
-		Enemy.EnemyKind.FAST,
-		Enemy.EnemyKind.TANK,
-		Enemy.EnemyKind.RANGED,
-		Enemy.EnemyKind.RANGED,
+		Enemy.EnemyKind.NORMAL, Enemy.EnemyKind.NORMAL, Enemy.EnemyKind.NORMAL,
+		Enemy.EnemyKind.FAST, Enemy.EnemyKind.FAST,
+		Enemy.EnemyKind.TANK, Enemy.EnemyKind.RANGED, Enemy.EnemyKind.RANGED,
 	]
+	if MapsData.has_ranged_bias(_active_mods):
+		kinds = [
+			Enemy.EnemyKind.RANGED, Enemy.EnemyKind.RANGED, Enemy.EnemyKind.RANGED,
+			Enemy.EnemyKind.NORMAL, Enemy.EnemyKind.FAST, Enemy.EnemyKind.TANK,
+		]
 
-	# Кластеры вдоль пути слева → направо (PoE-like density).
 	var clusters := 8
 	var per_cluster := int(ceil(float(count) / float(clusters)))
 	var spawned := 0
 	for c in clusters:
-		var cx := _map_rect.position.x + 280.0 + (MAP_W - 520.0) * (float(c) + 0.5) / float(clusters)
-		var cy := _map_rect.get_center().y + randf_range(-MAP_H * 0.22, MAP_H * 0.22)
+		var cx := _map_rect.position.x + 280.0 + (_map_rect.size.x - 520.0) * (float(c) + 0.5) / float(clusters)
+		var cy := _map_rect.get_center().y + randf_range(-_map_rect.size.y * 0.22, _map_rect.size.y * 0.22)
 		for j in per_cluster:
 			if spawned >= count:
 				break
@@ -276,18 +431,23 @@ func _spawn_zone_enemies(z: Dictionary) -> void:
 			if j == 0 and c % 3 == 2:
 				kind = Enemy.EnemyKind.TANK
 			enemy.setup(player, kind)
-			_scale_enemy(enemy, ilvl, act, false)
+			_scale_enemy(enemy, ilvl, act_or_tier, false)
+			if is_map:
+				MapsData.apply_to_enemy(enemy, _active_mods)
 			enemy.died.connect(_on_enemy_died)
 			_alive_enemies += 1
 			spawned += 1
 
 	if is_boss_zone:
-		_wave_label.text = "%s | БОСС: %s" % [z["name"], z["boss_name"]]
+		var bname: String = str(z["boss_name"])
+		_wave_label.text = "%s | БОСС: %s" % [z["name"], bname]
 		var boss: CharacterBody2D = ENEMY_SCENE.instantiate()
 		_world.add_child(boss)
 		boss.global_position = _exit_pos + Vector2(-160, 0)
 		boss.setup(player, Enemy.EnemyKind.BOSS)
-		_scale_enemy(boss, ilvl, act, true)
+		_scale_enemy(boss, ilvl, act_or_tier, true)
+		if is_map:
+			MapsData.apply_to_enemy(boss, _active_mods)
 		boss.died.connect(_on_enemy_died)
 		_alive_enemies += 1
 	else:
@@ -306,13 +466,14 @@ func _scale_enemy(enemy: CharacterBody2D, ilvl: int, act: int, is_boss: bool) ->
 
 
 func _refresh_enemy_hud() -> void:
-	var z: Dictionary = _current_zone()
+	if _run_mode == &"hub":
+		_wave_label.text = "Хаб | без врагов"
+		return
+	var title := str(_active_map.get("name", _current_zone()["name"]))
 	if _zone_clear:
-		_wave_label.text = "%s | ЗАЧИЩЕНО — иди к выходу →" % z["name"]
-	elif bool(z["boss"]):
-		_wave_label.text = "%s | БОСС: %s | осталось %d" % [z["name"], z["boss_name"], _alive_enemies]
-	else:
-		_wave_label.text = "%s | осталось врагов: %d" % [z["name"], _alive_enemies]
+		_wave_label.text = "%s | ЗАЧИЩЕНО — выход →" % title
+	elif _alive_enemies > 0:
+		_wave_label.text = "%s | осталось: %d" % [title, _alive_enemies]
 
 
 func _clamp_player() -> void:
@@ -332,7 +493,7 @@ func _on_gold(amount: int) -> void:
 
 
 func _on_player_died() -> void:
-	_hint_label.text = "Ты пал. R — начать кампанию заново."
+	_hint_label.text = "Ты пал. R — рестарт. F10 — хаб эндгейма."
 
 
 func _refresh_stats() -> void:
@@ -358,33 +519,69 @@ func _on_enemy_died(enemy: Node) -> void:
 	_alive_enemies = maxi(0, _alive_enemies - 1)
 	if is_instance_valid(enemy):
 		if player and player.stats.is_alive():
-			player.gain_xp(enemy.xp_reward())
-			player.add_gold(enemy.gold_reward())
+			var xp := int(round(float(enemy.xp_reward()) * _reward_xp_mult))
+			var gold := int(round(float(enemy.gold_reward()) * _reward_gold_mult))
+			player.gain_xp(xp)
+			player.add_gold(gold)
 		var drop: ItemData = enemy.roll_drop()
 		if drop:
 			_spawn_loot(enemy.global_position, drop)
 		_spawn_gold_pile(enemy.global_position, maxi(1, int(enemy.gold_reward() / 2)))
+		if enemy.kind == Enemy.EnemyKind.BOSS:
+			_maybe_drop_map(enemy.global_position)
 	_refresh_stats()
 	_refresh_enemy_hud()
 	if _alive_enemies <= 0 and player and player.stats.is_alive():
 		_on_zone_cleared()
 
 
+func _maybe_drop_map(pos: Vector2) -> void:
+	var chance := 0.35
+	if _run_mode == &"map":
+		chance = 0.7
+	elif _run_mode == &"campaign" and bool(_current_zone().get("boss", false)):
+		chance = 0.45
+	else:
+		return
+	if randf() > chance:
+		return
+	var tier := 1
+	if _run_mode == &"map":
+		tier = int(_active_map.get("tier", 1))
+	elif int(_current_zone().get("act", 1)) >= 4:
+		tier = 2
+	_spawn_loot(pos + Vector2(0, 24), ItemData.roll_map(tier))
+
+
 func _on_zone_cleared() -> void:
 	_zone_clear = true
-	var z: Dictionary = _current_zone()
 	_refresh_enemy_hud()
+
+	if _run_mode == &"map":
+		_flavor_label.text = "Карта пройдена. Портал в хаб справа."
+		_hint_label.text = "Выход справа / портал — в хаб. Можешь фармить снова."
+		_spawn_portal(_exit_pos, "ХАБ →")
+		_mark_exit_open()
+		return
+
+	var z: Dictionary = _current_zone()
 	var last := _zone_index >= _zones.size() - 1
 	var act_end := bool(z["boss"])
 
 	if last:
-		_flavor_label.text = "Морена пала. История (черновик) окончена — дальше будет эндгейм."
-		_hint_label.text = "Кампания пройдена. E — купец. R — рестарт."
+		_flavor_label.text = "Морена пала. Эндгейм открыт — алтарь карт в хабе."
+		_hint_label.text = "Кампания пройдена. Иди к выходу / F10 — хаб."
+		if not _endgame_unlocked:
+			_endgame_unlocked = true
+			_grant_starter_maps()
 		_spawn_merchant(_exit_pos + Vector2(-80, 80))
+		_spawn_map_device(_exit_pos + Vector2(40, 60))
+		_spawn_portal(_exit_pos, "ХАБ →")
+		_mark_exit_open()
 		return
 
 	if act_end:
-		_flavor_label.text = "Акт %d завершён. Купец у выхода. Иди вправо / в портал." % int(z["act"])
+		_flavor_label.text = "Акт %d завершён. Купец у выхода." % int(z["act"])
 		_hint_label.text = "E — купец. Выход справа → Акт %d." % (int(z["act"]) + 1)
 		_spawn_merchant(_exit_pos + Vector2(-100, 90))
 		_spawn_portal(_exit_pos, "Акт %d →" % (int(z["act"]) + 1))
@@ -392,14 +589,18 @@ func _on_zone_cleared() -> void:
 		_flavor_label.text = "Тропа свободна. Иди к выходу справа."
 		_hint_label.text = "Иди к выходу → (или портал / N / G)."
 		_spawn_portal(_exit_pos, "ДАЛЬШЕ →")
+	_mark_exit_open()
 
-	if _exit_marker and is_instance_valid(_exit_marker):
-		for c in _exit_marker.get_children():
-			if c is Polygon2D:
-				c.color = Color(0.4, 0.95, 0.7, 0.9)
-			elif c is Label:
-				c.modulate = Color(0.6, 1.0, 0.75, 1.0)
-				c.text = "ОТКРЫТО →"
+
+func _mark_exit_open() -> void:
+	if _exit_marker == null or not is_instance_valid(_exit_marker):
+		return
+	for c in _exit_marker.get_children():
+		if c is Polygon2D:
+			c.color = Color(0.4, 0.95, 0.7, 0.9)
+		elif c is Label:
+			c.modulate = Color(0.6, 1.0, 0.75, 1.0)
+			c.text = "ОТКРЫТО →"
 
 
 func _spawn_merchant(pos: Vector2) -> void:
@@ -420,6 +621,24 @@ func _spawn_merchant(pos: Vector2) -> void:
 	_world.add_child(_merchant)
 
 
+func _spawn_map_device(pos: Vector2) -> void:
+	if _map_device and is_instance_valid(_map_device):
+		_map_device.queue_free()
+	_map_device = Node2D.new()
+	_map_device.global_position = pos
+	_map_device.set_meta("device", true)
+	var body := Polygon2D.new()
+	body.polygon = [Vector2(-22, -10), Vector2(22, -10), Vector2(16, 18), Vector2(-16, 18)]
+	body.color = Color(0.3, 0.7, 0.55)
+	_map_device.add_child(body)
+	var lab := Label.new()
+	lab.text = "Алтарь карт\nE / M"
+	lab.position = Vector2(-42, -48)
+	lab.add_theme_font_size_override("font_size", 12)
+	_map_device.add_child(lab)
+	_world.add_child(_map_device)
+
+
 func _update_merchant_hint() -> void:
 	if _merchant == null or not is_instance_valid(_merchant) or player == null:
 		return
@@ -427,14 +646,21 @@ func _update_merchant_hint() -> void:
 		_hint_label.text = "Купец: E — случайный свиток за 30 золота"
 
 
-func _try_merchant_buy() -> void:
+func _update_device_hint() -> void:
+	if _map_device == null or not is_instance_valid(_map_device) or player == null:
+		return
+	if player.global_position.distance_to(_map_device.global_position) < 55.0:
+		_hint_label.text = "Алтарь карт: E или M — выбрать карту"
+
+
+func _try_merchant_buy() -> bool:
 	if _merchant == null or not is_instance_valid(_merchant) or player == null:
-		return
+		return false
 	if player.global_position.distance_to(_merchant.global_position) > 50.0:
-		return
+		return false
 	if player.gold < 30:
 		FloatingText.spawn(self, player.global_position, "Мало золота", Color(1.0, 0.4, 0.4))
-		return
+		return true
 	player.add_gold(-30)
 	var scroll := ItemData.roll_scroll()
 	if player.try_pickup(scroll):
@@ -442,6 +668,53 @@ func _try_merchant_buy() -> void:
 	else:
 		player.add_gold(30)
 		FloatingText.spawn(self, player.global_position, "Сумка полна", Color(1.0, 0.4, 0.4))
+	return true
+
+
+func _try_open_map_device(require_near: bool = false) -> void:
+	if not _endgame_unlocked and _run_mode != &"hub":
+		FloatingText.spawn(self, player.global_position, "Сначала дойди до конца кампании (или F10)", Color(1.0, 0.7, 0.4))
+		return
+	if require_near:
+		if _map_device == null or not is_instance_valid(_map_device):
+			return
+		if player.global_position.distance_to(_map_device.global_position) > 55.0:
+			return
+	_open_map_panel()
+
+
+func _open_map_panel() -> void:
+	if inventory_ui and inventory_ui.visible:
+		inventory_ui.toggle()
+		player.inventory_open = false
+	for c in _map_list.get_children():
+		c.queue_free()
+	var maps: Array = []
+	for e in player.inventory.bag:
+		var it: ItemData = e["item"]
+		if it.is_map():
+			maps.append(it)
+	if maps.is_empty():
+		var empty := Label.new()
+		empty.text = "Нет карт в сумке. Убивай боссов карт / актов."
+		_map_list.add_child(empty)
+	else:
+		for it in maps:
+			var btn := Button.new()
+			btn.text = it.display_name
+			btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			var map_ref: ItemData = it
+			btn.pressed.connect(func() -> void:
+				_close_map_panel()
+				_enter_endgame_map(map_ref)
+			)
+			_map_list.add_child(btn)
+	_map_panel.visible = true
+
+
+func _close_map_panel() -> void:
+	if _map_panel:
+		_map_panel.visible = false
 
 
 func _spawn_portal(pos: Vector2, label_text: String = "ПОРТАЛ") -> void:
@@ -475,8 +748,7 @@ func _try_portal() -> void:
 
 
 func _try_edge_exit() -> void:
-	# PoE-like: после зачистки достаточно дойти до правого края.
-	if not _zone_clear or _transitioning:
+	if not _zone_clear or _transitioning or _run_mode == &"hub":
 		return
 	if player.global_position.x >= _map_rect.end.x - 90.0:
 		_go_next_zone()
@@ -484,6 +756,14 @@ func _try_edge_exit() -> void:
 
 func _go_next_zone() -> void:
 	if _transitioning:
+		return
+	if _run_mode == &"map":
+		_transitioning = true
+		_enter_hub()
+		return
+	if _run_mode == &"campaign" and _zone_index >= _zones.size() - 1:
+		_transitioning = true
+		_enter_hub()
 		return
 	if _zone_index >= _zones.size() - 1:
 		return

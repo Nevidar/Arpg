@@ -1,6 +1,8 @@
 class_name ItemData
 extends RefCounted
 
+const MapsData := preload("res://scripts/world/endgame_maps.gd")
+
 enum Slot { WEAPON, HELMET, BODY, GLOVES, BOOTS, SHIELD, RING, AMULET, BACK, CURRENCY }
 enum Rarity { NORMAL, MAGIC, RARE, UNIQUE }
 
@@ -19,6 +21,9 @@ var grid_w: int = 1
 var grid_h: int = 1
 ## Для свитков: transmute / augment / alchemy
 var craft_id: StringName = &""
+## Для карт эндгейма
+var map_id: StringName = &""
+var map_tier: int = 0
 
 
 static func create_base(slot: Slot, base_name: String, base_damage: float = 0.0, base_armor: float = 0.0) -> ItemData:
@@ -89,6 +94,25 @@ static func make_scroll(craft: StringName, name: String, _hint: String) -> ItemD
 	item.color = Color(0.55, 0.35, 0.85)
 	item.display_name = name
 	return item
+
+
+static func make_map(map_id: StringName, map_name: String, tier: int) -> ItemData:
+	var item := create_base(Slot.CURRENCY, map_name, 0.0, 0.0)
+	item.map_id = map_id
+	item.map_tier = tier
+	item.identified = true
+	item.color = Color(0.35, 0.75, 0.55)
+	item.display_name = "Карта: %s (T%d)" % [map_name, tier]
+	item.grid_w = 1
+	item.grid_h = 1
+	return item
+
+
+static func roll_map(tier_prefer: int = 1) -> ItemData:
+	var bases: Array = MapsData.bases()
+	var idx := clampi(tier_prefer - 1 + randi_range(0, 1), 0, bases.size() - 1)
+	var b: Dictionary = bases[idx]
+	return make_map(b["id"], b["name"], int(b["tier"]))
 
 
 func _apply_rarity_affixes() -> void:
@@ -290,13 +314,17 @@ func short_label() -> String:
 		Slot.AMULET:
 			return "A"
 		Slot.CURRENCY:
-			return "※"
+			return "M" if map_id != &"" else "C"
 		_:
-			return "·"
+			return "."
 
 
 func is_currency() -> bool:
 	return slot == Slot.CURRENCY
+
+
+func is_map() -> bool:
+	return map_id != &""
 
 
 func craft_hint() -> String:
