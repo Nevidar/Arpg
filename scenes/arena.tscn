@@ -69,11 +69,29 @@ offset_bottom = 68.0
 theme_override_font_sizes/font_size = 16
 text = "Волна 1"
 
+[node name="StatsLabel" type="Label" parent="HUD/Root"]
+layout_mode = 0
+offset_left = 16.0
+offset_top = 72.0
+offset_right = 420.0
+offset_bottom = 130.0
+theme_override_font_sizes/font_size = 14
+text = "Статы"
+
+[node name="InvLabel" type="Label" parent="HUD/Root"]
+layout_mode = 0
+offset_left = 900.0
+offset_top = 12.0
+offset_right = 1260.0
+offset_bottom = 260.0
+theme_override_font_sizes/font_size = 13
+text = "Инвентарь"
+
 [node name="HintLabel" type="Label" parent="HUD/Root"]
 layout_mode = 0
 offset_left = 16.0
 offset_top = 680.0
-offset_right = 900.0
+offset_right = 1100.0
 offset_bottom = 712.0
 theme_override_font_sizes/font_size = 14
 text = "Управление"

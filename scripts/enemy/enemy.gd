@@ -82,24 +82,26 @@ func _physics_process(delta: float) -> void:
 
 	var to_player := player.global_position - global_position
 	var dist := to_player.length()
+	var dir := to_player.normalized() if dist > 0.001 else Vector2.RIGHT
 
 	match kind:
 		EnemyKind.RANGED:
-			if dist < 180.0:
-				velocity = -to_player.normalized() * stats.move_speed
-			elif dist > 260.0:
-				velocity = to_player.normalized() * stats.move_speed
-			else:
-				velocity = Vector2.ZERO
-			if dist < 320.0 and _attack_cd <= 0.0:
-				_ranged_attack(to_player.normalized())
-		_:
-			if dist > 28.0:
-				velocity = to_player.normalized() * stats.move_speed
+			# Не убегает: подходит, пока цель вне радиуса атаки, иначе стоит и стреляет.
+			const RANGED_RANGE := 280.0
+			if dist > RANGED_RANGE:
+				velocity = dir * stats.move_speed
 			else:
 				velocity = Vector2.ZERO
 				if _attack_cd <= 0.0:
-					_melee_attack(to_player.normalized())
+					_ranged_attack(dir)
+		_:
+			const MELEE_RANGE := 28.0
+			if dist > MELEE_RANGE:
+				velocity = dir * stats.move_speed
+			else:
+				velocity = Vector2.ZERO
+				if _attack_cd <= 0.0:
+					_melee_attack(dir)
 
 	move_and_slide()
 
@@ -128,6 +130,34 @@ func _ranged_attack(dir: Vector2) -> void:
 			player.apply_damage(hit)
 		marker.queue_free()
 	)
+
+
+func xp_reward() -> int:
+	match kind:
+		EnemyKind.FAST:
+			return 12
+		EnemyKind.TANK:
+			return 28
+		EnemyKind.RANGED:
+			return 16
+		_:
+			return 10
+
+
+func roll_drop() -> ItemData:
+	var roll := randf()
+	if roll < 0.45:
+		return null
+	var rarity := ItemData.Rarity.NORMAL
+	if roll > 0.92:
+		rarity = ItemData.Rarity.RARE
+	elif roll > 0.75:
+		rarity = ItemData.Rarity.MAGIC
+	if randf() < 0.65:
+		var names := ["Меч", "Топор", "Двуручный топор", "Молот"]
+		var dmg := 10.0 + float(rarity) * 4.0 + randf_range(0.0, 3.0)
+		return ItemData.make_weapon(names[randi() % names.size()], dmg, rarity)
+	return ItemData.make_armor("Нагрудник", 5.0 + float(rarity) * 4.0, 10.0 + float(rarity) * 8.0, rarity)
 
 
 func apply_damage(hit: Damage) -> void:
