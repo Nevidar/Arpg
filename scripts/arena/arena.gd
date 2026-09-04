@@ -5,6 +5,7 @@ const ENEMY_SCENE := preload("res://scenes/enemy.tscn")
 
 @onready var _world: Node2D = $World
 @onready var _spawn_points: Node2D = $SpawnPoints
+@onready var _hud_root: Control = $HUD/Root
 @onready var _hp_label: Label = $HUD/Root/HpLabel
 @onready var _hint_label: Label = $HUD/Root/HintLabel
 @onready var _wave_label: Label = $HUD/Root/WaveLabel
@@ -13,24 +14,32 @@ const ENEMY_SCENE := preload("res://scenes/enemy.tscn")
 @onready var _passive_label: Label = $HUD/Root/PassiveLabel
 
 var player: CharacterBody2D
+var inventory_ui: InventoryUI
 var _wave: int = 1
 var _alive_enemies: int = 0
 var _loot_nodes: Array[Node2D] = []
 
 
 func _ready() -> void:
-	_hint_label.text = "WASD | ЛКМ удар | Q сплеш | E slam(ур4) | Пробел рывок | 1-9 экип | I опознать | F1-F8 пассивки | R рестарт"
+	_hint_label.text = "WASD бой | I/Tab инвентарь | Q/E навыки | Пробел рывок | F1-F8 пассивки | R рестарт"
 	_spawn_player()
 	_spawn_wave()
 
 
 func _process(_delta: float) -> void:
-	_try_pickup_loot()
+	if player and not player.inventory_open:
+		_try_pickup_loot()
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and event.keycode == KEY_R:
-		get_tree().reload_current_scene()
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_R and (player == null or not player.inventory_open):
+			get_tree().reload_current_scene()
+		elif event.keycode == KEY_I or event.keycode == KEY_TAB:
+			if inventory_ui:
+				inventory_ui.toggle()
+				player.inventory_open = inventory_ui.visible
+				get_viewport().set_input_as_handled()
 
 
 func _spawn_player() -> void:
@@ -42,6 +51,12 @@ func _spawn_player() -> void:
 	player.progress_changed.connect(_refresh_stats)
 	player.inventory_changed.connect(_refresh_inv)
 	player.passives.changed.connect(_refresh_passives)
+
+	inventory_ui = InventoryUI.new()
+	_hud_root.add_child(inventory_ui)
+	inventory_ui.setup(player)
+	inventory_ui.closed.connect(func() -> void: player.inventory_open = false)
+
 	_on_player_hp(player.stats.hp, player.stats.max_hp)
 	_refresh_stats()
 	_refresh_inv()
@@ -67,6 +82,8 @@ func _refresh_stats() -> void:
 
 func _refresh_inv() -> void:
 	_inv_label.text = "\n".join(player.inventory.summary_lines())
+	if inventory_ui and inventory_ui.visible:
+		inventory_ui.refresh()
 
 
 func _refresh_passives() -> void:

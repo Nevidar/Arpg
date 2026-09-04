@@ -15,6 +15,8 @@ var color: Color = Color(0.8, 0.8, 0.8)
 var identified: bool = true
 var prefixes: Array[ItemAffix] = []
 var suffixes: Array[ItemAffix] = []
+var grid_w: int = 1
+var grid_h: int = 1
 
 
 static func create_base(slot: Slot, base_name: String, base_damage: float = 0.0, base_armor: float = 0.0) -> ItemData:
@@ -28,6 +30,7 @@ static func create_base(slot: Slot, base_name: String, base_damage: float = 0.0,
 	item.rarity = Rarity.NORMAL
 	item.identified = true
 	item.color = Color(0.75, 0.75, 0.75)
+	item._set_grid_size()
 	return item
 
 
@@ -169,7 +172,7 @@ func tooltip_lines() -> PackedStringArray:
 	var lines: PackedStringArray = []
 	lines.append("%s [%s/%s]" % [display_name, rarity_label(), slot_label()])
 	if not identified:
-		lines.append("Не опознан (I)")
+		lines.append("Не опознан — кнопка в инвентаре")
 		return lines
 	if base_damage > 0.0:
 		lines.append("Баз. урон: %.0f" % base_damage)
@@ -195,3 +198,56 @@ func accumulate_into(bag: Dictionary) -> void:
 func _acc(bag: Dictionary, a: ItemAffix) -> void:
 	var key := int(a.stat)
 	bag[key] = float(bag.get(key, 0.0)) + a.value
+
+
+func _set_grid_size() -> void:
+	## Размеры в духе PoE/D2
+	match slot:
+		Slot.WEAPON:
+			if "Двуручный" in base_name or base_name == "Молот":
+				grid_w = 2
+				grid_h = 3
+			else:
+				grid_w = 1
+				grid_h = 3
+		Slot.BODY:
+			grid_w = 2
+			grid_h = 3
+		Slot.SHIELD:
+			grid_w = 2
+			grid_h = 3
+		Slot.HELMET, Slot.GLOVES, Slot.BOOTS:
+			grid_w = 2
+			grid_h = 2
+		Slot.RING:
+			grid_w = 1
+			grid_h = 1
+		Slot.AMULET:
+			grid_w = 1
+			grid_h = 1
+		Slot.BACK:
+			grid_w = 2
+			grid_h = 2
+		_:
+			grid_w = 1
+			grid_h = 1
+
+
+func short_label() -> String:
+	if not identified:
+		return "?"
+	match slot:
+		Slot.WEAPON:
+			return "W"
+		Slot.HELMET:
+			return "H"
+		Slot.BODY:
+			return "B"
+		Slot.GLOVES:
+			return "G"
+		Slot.BOOTS:
+			return "F"
+		Slot.SHIELD:
+			return "S"
+		_:
+			return "·"

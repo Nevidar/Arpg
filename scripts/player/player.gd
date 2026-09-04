@@ -12,6 +12,7 @@ var progress: PlayerProgress = PlayerProgress.new()
 var inventory: Inventory = Inventory.new()
 var passives: PassiveTree = PassiveTree.new()
 var life_leech: float = 0.0
+var inventory_open: bool = false
 
 var _dash_time: float = 0.0
 var _dash_cooldown: float = 0.0
@@ -74,6 +75,11 @@ func _physics_process(delta: float) -> void:
 
 	_update_shake(delta)
 
+	if inventory_open:
+		velocity = Vector2.ZERO
+		move_and_slide()
+		return
+
 	if _dash_time > 0.0:
 		_dash_time -= delta
 		move_and_slide()
@@ -107,13 +113,7 @@ func _physics_process(delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		var code: int = event.keycode
-		if code >= KEY_1 and code <= KEY_9:
-			inventory.equip(code - KEY_1)
-		elif code == KEY_I:
-			if inventory.identify_first():
-				Sfx.play_pickup()
-				_spawn_float_text("Опознано", Color(0.5, 0.8, 1.0))
-		elif code >= KEY_F1 and code <= KEY_F8:
+		if code >= KEY_F1 and code <= KEY_F8 and not inventory_open:
 			if passives.try_buy(code - KEY_F1):
 				Sfx.play_level_up()
 				_spawn_float_text("Пассивка!", Color(0.7, 0.9, 0.4))

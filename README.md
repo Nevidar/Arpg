@@ -13,6 +13,7 @@
 - `02_Slavic_Mythology_Lore.md` — лор
 - `03_Author_Notes_Raw.md` — сырые заметки автора
 - `MVP-plan.txt` — план MVP
+- `04_Inventory_Design.md` — референсы инвентаря PoE / Diablo / Hero Siege
 - `base/` — **замороженный снимок доков, не редактировать**
 
 ## Код
