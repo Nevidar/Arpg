@@ -37,6 +37,24 @@ func play_level_up() -> void:
 	_play_tone(660.0, 0.1, 0.35)
 
 
+func play_splash() -> void:
+	_play_tone(240.0, 0.07, 0.32)
+	await get_tree().create_timer(0.05).timeout
+	_play_tone(160.0, 0.08, 0.28)
+
+
+func play_slam() -> void:
+	_play_tone(90.0, 0.1, 0.45)
+	await get_tree().create_timer(0.06).timeout
+	_play_tone(70.0, 0.12, 0.4)
+
+
+func play_portal() -> void:
+	_play_tone(300.0, 0.1, 0.3)
+	await get_tree().create_timer(0.08).timeout
+	_play_tone(480.0, 0.12, 0.35)
+
+
 func _play_tone(freq: float, duration: float, volume: float) -> void:
 	var sample_rate := 22050
 	var frames := int(sample_rate * duration)

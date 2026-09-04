@@ -9,8 +9,12 @@ static func apply_scroll(scroll: ItemData, target: ItemData) -> String:
 		return "Нет цели"
 	if scroll.is_map() or String(scroll.craft_id) == "":
 		return "Это не свиток"
+	if target.is_map():
+		return "Нельзя на карту"
 	if target.is_currency():
 		return "Нельзя на свиток"
+	if target.is_unique():
+		return "Уники не крафтятся"
 	if not target.identified and String(scroll.craft_id) != "alchemy":
 		# alchemy тоже лучше на опознанном, но разрешим после авто-id
 		target.identify()
@@ -51,5 +55,31 @@ static func apply_scroll(scroll: ItemData, target: ItemData) -> String:
 			target.color = Color(1.0, 0.85, 0.2)
 			target._rebuild_name()
 			return "Алхимия свершилась"
+		"regal":
+			if target.rarity != ItemData.Rarity.MAGIC:
+				return "Нужен магический предмет"
+			target.rarity = ItemData.Rarity.RARE
+			var has_pref := not target.prefixes.is_empty()
+			var has_suf := not target.suffixes.is_empty()
+			if has_pref and has_suf:
+				target._add_one_affix(randf() < 0.5)
+			elif has_pref:
+				target._add_one_affix(false)
+			else:
+				target._add_one_affix(true)
+			target.identified = true
+			target.color = Color(1.0, 0.85, 0.2)
+			target._rebuild_name()
+			return "Регал наложен"
+		"scour":
+			if target.rarity != ItemData.Rarity.MAGIC and target.rarity != ItemData.Rarity.RARE:
+				return "Нужен маг./редкий"
+			target.rarity = ItemData.Rarity.NORMAL
+			target.prefixes.clear()
+			target.suffixes.clear()
+			target.identified = true
+			target.color = Color(0.75, 0.75, 0.75)
+			target.display_name = target.base_name
+			return "Аффиксы смыты"
 		_:
 			return "Неизвестный свиток"

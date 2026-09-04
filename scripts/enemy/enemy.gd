@@ -13,6 +13,9 @@ var _attack_cd: float = 0.0
 var _hit_flash: float = 0.0
 var _body_color: Color = Color(0.55, 0.2, 0.25)
 var _aggroed: bool = false
+var is_champion: bool = false
+var is_rare: bool = false
+var _aura: Polygon2D
 
 @onready var _visual: Polygon2D = $Visual
 @onready var _hp_bar: Polygon2D = $HpBar
@@ -34,25 +37,64 @@ func setup(p: Node2D, enemy_kind: EnemyKind) -> void:
 	_visual.color = _body_color
 
 
+func promote_champion() -> void:
+	if kind == EnemyKind.BOSS:
+		return
+	is_champion = true
+	stats.max_hp *= 2.0
+	stats.base_damage *= 1.25
+	stats.hp = stats.max_hp
+	scale *= 1.2
+	_body_color = Color(0.95, 0.78, 0.25)
+	_visual.color = _body_color
+	_ensure_aura(Color(1.0, 0.85, 0.2, 0.35), 1.35)
+
+
+func promote_rare() -> void:
+	if kind == EnemyKind.BOSS:
+		return
+	is_rare = true
+	is_champion = false
+	stats.max_hp *= 3.2
+	stats.base_damage *= 1.4
+	stats.armor += 12.0
+	stats.hp = stats.max_hp
+	scale *= 1.4
+	_body_color = Color(0.75, 0.35, 1.0)
+	_visual.color = _body_color
+	_ensure_aura(Color(0.7, 0.35, 1.0, 0.4), 1.55)
+
+
+func _ensure_aura(col: Color, sc: float) -> void:
+	if _aura and is_instance_valid(_aura):
+		_aura.queue_free()
+	_aura = Polygon2D.new()
+	_aura.z_index = -1
+	_aura.color = col
+	_aura.polygon = [Vector2(-16, -16), Vector2(16, -16), Vector2(16, 16), Vector2(-16, 16)]
+	_aura.scale = Vector2(sc, sc)
+	add_child(_aura)
+
+
 func _apply_kind() -> void:
 	match kind:
 		EnemyKind.NORMAL:
 			stats.max_hp = 40.0
-			stats.base_damage = 6.0
+			stats.base_damage = 4.5
 			stats.move_speed = 95.0
 			stats.resist_physical = 0.0
 			_body_color = Color(0.55, 0.2, 0.25)
 			scale = Vector2.ONE
 		EnemyKind.FAST:
 			stats.max_hp = 22.0
-			stats.base_damage = 5.0
-			stats.move_speed = 160.0
+			stats.base_damage = 3.8
+			stats.move_speed = 155.0
 			stats.evasion = 40.0
 			_body_color = Color(0.75, 0.45, 0.15)
 			scale = Vector2(0.85, 0.85)
 		EnemyKind.TANK:
 			stats.max_hp = 120.0
-			stats.base_damage = 10.0
+			stats.base_damage = 7.5
 			stats.move_speed = 55.0
 			stats.armor = 25.0
 			stats.resist_physical = 0.15
@@ -60,13 +102,13 @@ func _apply_kind() -> void:
 			scale = Vector2(1.35, 1.35)
 		EnemyKind.RANGED:
 			stats.max_hp = 28.0
-			stats.base_damage = 8.0
+			stats.base_damage = 6.0
 			stats.move_speed = 80.0
 			_body_color = Color(0.25, 0.45, 0.55)
 			scale = Vector2(0.95, 0.95)
 		EnemyKind.BOSS:
 			stats.max_hp = 420.0
-			stats.base_damage = 16.0
+			stats.base_damage = 12.0
 			stats.move_speed = 70.0
 			stats.armor = 35.0
 			stats.resist_physical = 0.2
@@ -95,8 +137,8 @@ func _physics_process(delta: float) -> void:
 	var dir := to_player.normalized() if dist > 0.001 else Vector2.RIGHT
 
 	# На большой карте не бегут всей толпой с другого края.
-	const AGGRO := 420.0
-	const DEAGGRO := 560.0
+	const AGGRO := 360.0
+	const DEAGGRO := 480.0
 	if not _aggroed:
 		if dist <= AGGRO:
 			_aggroed = true
@@ -159,37 +201,58 @@ func _ranged_attack(dir: Vector2) -> void:
 
 
 func xp_reward() -> int:
+	var base := 10
 	match kind:
 		EnemyKind.FAST:
-			return 12
+			base = 12
 		EnemyKind.TANK:
-			return 28
+			base = 28
 		EnemyKind.RANGED:
-			return 16
+			base = 16
 		EnemyKind.BOSS:
-			return 120
+			base = 120
 		_:
-			return 10
+			base = 10
+	if is_rare:
+		return int(base * 3.5)
+	if is_champion:
+		return int(base * 2.0)
+	return base
 
 
 func gold_reward() -> int:
+	var g := 4
 	match kind:
 		EnemyKind.BOSS:
-			return randi_range(40, 70)
+			g = randi_range(40, 70)
 		EnemyKind.TANK:
-			return randi_range(8, 18)
+			g = randi_range(8, 18)
 		EnemyKind.RANGED:
-			return randi_range(4, 10)
+			g = randi_range(4, 10)
 		EnemyKind.FAST:
-			return randi_range(3, 8)
+			g = randi_range(3, 8)
 		_:
-			return randi_range(2, 6)
+			g = randi_range(2, 6)
+	if is_rare:
+		return g * 4
+	if is_champion:
+		return g * 2
+	return g
 
 
 func roll_drop() -> ItemData:
-	if randf() < 0.42:
+	var miss := 0.42
+	if is_rare:
+		miss = 0.05
+	elif is_champion:
+		miss = 0.18
+	if randf() < miss:
 		return null
-	return ItemData.roll_loot(1 + int(stats.max_hp / 40.0))
+	var item := ItemData.roll_loot(1 + int(stats.max_hp / 40.0))
+	if is_rare and item and item.rarity == ItemData.Rarity.NORMAL and randf() < 0.55:
+		item.rarity = ItemData.Rarity.RARE
+		item._apply_rarity_affixes()
+	return item
 
 
 func apply_damage(hit: Damage) -> void:

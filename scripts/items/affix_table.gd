@@ -1,7 +1,7 @@
 class_name AffixTable
 extends RefCounted
 
-## Пул аффиксов (~35). T1 сильнее, T9 слабее.
+## Пул аффиксов (~40). T1 сильнее, T9 слабее.
 
 
 static func all() -> Array[AffixDef]:
@@ -24,6 +24,9 @@ static func all() -> Array[AffixDef]:
 	list.append(_p("тёмный", "Тёмный", AffixDef.Stat.RESIST_CHAOS, 0.25, 0.04))
 	list.append(_p("плотный", "Плотный", AffixDef.Stat.RESIST_PHYS, 0.2, 0.03))
 	list.append(_p("жадный", "Жадный", AffixDef.Stat.LIFE_LEECH, 0.08, 0.01))
+	list.append(_p("велесов", "Велесов", AffixDef.Stat.FLAT_DAMAGE, 10, 1.5))
+	list.append(_p("перунов", "Перунов", AffixDef.Stat.CRIT_CHANCE, 0.15, 0.025))
+	list.append(_p("бережный", "Бережный", AffixDef.Stat.FLAT_HP, 48, 7))
 
 	list.append(_s("силы", "силы", AffixDef.Stat.FLAT_DAMAGE, 6, 1))
 	list.append(_s("мощи", "мощи", AffixDef.Stat.INCREASED_DAMAGE, 0.2, 0.03))
@@ -44,6 +47,8 @@ static func all() -> Array[AffixDef]:
 	list.append(_s("нави", "нави", AffixDef.Stat.RESIST_CHAOS, 0.22, 0.03))
 	list.append(_s("камня", "камня", AffixDef.Stat.RESIST_PHYS, 0.18, 0.03))
 	list.append(_s("крови", "крови", AffixDef.Stat.LIFE_LEECH, 0.06, 0.01))
+	list.append(_s("яровита", "яровита", AffixDef.Stat.ATTACK_SPEED, 0.22, 0.035))
+	list.append(_s("щита", "щита", AffixDef.Stat.BLOCK_CHANCE, 0.24, 0.04))
 	return list
 
 

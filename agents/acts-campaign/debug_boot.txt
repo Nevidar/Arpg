@@ -1,29 +1,128 @@
-scene=Arena:<Node2D#34678506969>
+scene=Arena:<Node2D#36171679193>
 script_ok=true
-world=World:<Node2D#34728838643>
-world_n=14
-child=Player class=CharacterBody2D pos=(639.9929, 360.2243) visible=true
+world=World:<Node2D#36222010867>
+world_n=74
+child=Player class=CharacterBody2D pos=(200.0, 760.0) visible=true
   visual type=Polygon2D color=(0.75, 0.55, 0.35, 1.0)
-child=@Polygon2D@235 class=Polygon2D pos=(220.0, 200.0) visible=true
-child=@Polygon2D@236 class=Polygon2D pos=(980.0, 180.0) visible=true
-child=@Polygon2D@237 class=Polygon2D pos=(240.0, 520.0) visible=true
-child=@Polygon2D@238 class=Polygon2D pos=(1000.0, 500.0) visible=true
-child=@Polygon2D@239 class=Polygon2D pos=(640.0, 160.0) visible=true
-child=@Polygon2D@240 class=Polygon2D pos=(640.0, 560.0) visible=true
-child=@Polygon2D@241 class=Polygon2D pos=(400.0, 360.0) visible=true
-child=@Polygon2D@242 class=Polygon2D pos=(880.0, 360.0) visible=true
-child=Enemy class=CharacterBody2D pos=(217.4327, 146.7713) visible=true
+child=@Polygon2D@249 class=Polygon2D pos=(1544.755, 445.529) visible=true
+child=@Polygon2D@250 class=Polygon2D pos=(819.4907, 928.9631) visible=true
+child=@Polygon2D@251 class=Polygon2D pos=(854.0211, 422.2011) visible=true
+child=@Polygon2D@252 class=Polygon2D pos=(591.6905, 1048.046) visible=true
+child=@Polygon2D@253 class=Polygon2D pos=(790.7451, 305.9169) visible=true
+child=@Polygon2D@254 class=Polygon2D pos=(1856.581, 987.7193) visible=true
+child=@Polygon2D@255 class=Polygon2D pos=(1134.345, 596.6479) visible=true
+child=@Polygon2D@256 class=Polygon2D pos=(1236.34, 1194.801) visible=true
+child=@Polygon2D@257 class=Polygon2D pos=(1821.391, 631.0505) visible=true
+child=@Polygon2D@258 class=Polygon2D pos=(967.9011, 903.5151) visible=true
+child=@Polygon2D@259 class=Polygon2D pos=(1519.415, 546.3052) visible=true
+child=@Polygon2D@260 class=Polygon2D pos=(1070.354, 1188.417) visible=true
+child=@Polygon2D@261 class=Polygon2D pos=(1006.244, 468.8292) visible=true
+child=@Polygon2D@262 class=Polygon2D pos=(330.9739, 1101.787) visible=true
+child=@Polygon2D@263 class=Polygon2D pos=(497.5729, 291.9295) visible=true
+child=@Polygon2D@264 class=Polygon2D pos=(1079.883, 1017.582) visible=true
+child=@Polygon2D@265 class=Polygon2D pos=(1624.548, 401.7105) visible=true
+child=@Polygon2D@266 class=Polygon2D pos=(598.1022, 1088.469) visible=true
+child=@Polygon2D@267 class=Polygon2D pos=(1674.036, 381.5147) visible=true
+child=@Polygon2D@268 class=Polygon2D pos=(1364.976, 957.6446) visible=true
+child=@Polygon2D@269 class=Polygon2D pos=(1964.788, 565.1771) visible=true
+child=@Polygon2D@270 class=Polygon2D pos=(1056.192, 1203.267) visible=true
+child=@Polygon2D@271 class=Polygon2D pos=(1706.843, 634.8421) visible=true
+child=@Polygon2D@272 class=Polygon2D pos=(1899.645, 1008.942) visible=true
+child=@Polygon2D@273 class=Polygon2D pos=(947.8212, 411.829) visible=true
+child=@Polygon2D@274 class=Polygon2D pos=(303.2373, 1227.76) visible=true
+child=@Polygon2D@275 class=Polygon2D pos=(1715.728, 341.8842) visible=true
+child=@Polygon2D@276 class=Polygon2D pos=(1752.22, 932.9054) visible=true
+child=@Node2D@279 class=Node2D pos=(2140.0, 760.0) visible=true
+child=Enemy class=CharacterBody2D pos=(435.7968, 692.6458) visible=true
   visual type=Polygon2D color=(0.55, 0.2, 0.25, 1.0)
-child=@CharacterBody2D@244 class=CharacterBody2D pos=(1062.937, 160.3828) visible=true
+child=@CharacterBody2D@280 class=CharacterBody2D pos=(491.265, 739.7639) visible=true
+  visual type=Polygon2D color=(0.95, 0.78, 0.25, 1.0)
+child=@CharacterBody2D@282 class=CharacterBody2D pos=(466.0336, 775.317) visible=true
   visual type=Polygon2D color=(0.55, 0.2, 0.25, 1.0)
-child=@CharacterBody2D@245 class=CharacterBody2D pos=(248.7521, 539.2571) visible=true
+child=@CharacterBody2D@283 class=CharacterBody2D pos=(326.661, 734.6684) visible=true
+  visual type=Polygon2D color=(0.75, 0.35, 1.0, 1.0)
+child=@CharacterBody2D@285 class=CharacterBody2D pos=(390.4456, 781.624) visible=true
   visual type=Polygon2D color=(0.75, 0.45, 0.15, 1.0)
-child=@CharacterBody2D@246 class=CharacterBody2D pos=(1082.886, 563.0445) visible=true
+child=@CharacterBody2D@286 class=CharacterBody2D pos=(504.6552, 788.0039) visible=true
   visual type=Polygon2D color=(0.35, 0.3, 0.45, 1.0)
-child=@CharacterBody2D@247 class=CharacterBody2D pos=(647.8078, 115.3745) visible=true
+child=@CharacterBody2D@287 class=CharacterBody2D pos=(646.5803, 655.7849) visible=true
   visual type=Polygon2D color=(0.25, 0.45, 0.55, 1.0)
+child=@CharacterBody2D@288 class=CharacterBody2D pos=(674.0568, 636.7758) visible=true
+  visual type=Polygon2D color=(0.95, 0.78, 0.25, 1.0)
+child=@CharacterBody2D@290 class=CharacterBody2D pos=(588.8976, 581.8021) visible=true
+  visual type=Polygon2D color=(0.55, 0.2, 0.25, 1.0)
+child=@CharacterBody2D@291 class=CharacterBody2D pos=(617.6496, 592.4565) visible=true
+  visual type=Polygon2D color=(0.55, 0.2, 0.25, 1.0)
+child=@CharacterBody2D@292 class=CharacterBody2D pos=(712.1725, 574.2703) visible=true
+  visual type=Polygon2D color=(0.55, 0.2, 0.25, 1.0)
+child=@CharacterBody2D@293 class=CharacterBody2D pos=(729.6868, 655.1125) visible=true
+  visual type=Polygon2D color=(0.75, 0.45, 0.15, 1.0)
+child=@CharacterBody2D@294 class=CharacterBody2D pos=(818.3895, 651.9245) visible=true
+  visual type=Polygon2D color=(0.35, 0.3, 0.45, 1.0)
+child=@CharacterBody2D@295 class=CharacterBody2D pos=(920.7788, 661.1432) visible=true
+  visual type=Polygon2D color=(0.35, 0.3, 0.45, 1.0)
+child=@CharacterBody2D@296 class=CharacterBody2D pos=(960.4799, 679.4525) visible=true
+  visual type=Polygon2D color=(0.95, 0.78, 0.25, 1.0)
+child=@CharacterBody2D@298 class=CharacterBody2D pos=(873.3771, 680.5128) visible=true
+  visual type=Polygon2D color=(0.25, 0.45, 0.55, 1.0)
+child=@CharacterBody2D@299 class=CharacterBody2D pos=(843.7313, 683.5085) visible=true
+  visual type=Polygon2D color=(0.55, 0.2, 0.25, 1.0)
+child=@CharacterBody2D@300 class=CharacterBody2D pos=(960.7066, 606.1217) visible=true
+  visual type=Polygon2D color=(0.55, 0.2, 0.25, 1.0)
+child=@CharacterBody2D@301 class=CharacterBody2D pos=(1126.641, 965.7309) visible=true
+  visual type=Polygon2D color=(0.55, 0.2, 0.25, 1.0)
+child=@CharacterBody2D@302 class=CharacterBody2D pos=(1170.732, 936.9899) visible=true
+  visual type=Polygon2D color=(0.75, 0.45, 0.15, 1.0)
+child=@CharacterBody2D@303 class=CharacterBody2D pos=(1184.918, 938.9022) visible=true
+  visual type=Polygon2D color=(0.75, 0.45, 0.15, 1.0)
+child=@CharacterBody2D@304 class=CharacterBody2D pos=(1138.412, 983.541) visible=true
+  visual type=Polygon2D color=(0.35, 0.3, 0.45, 1.0)
+child=@CharacterBody2D@305 class=CharacterBody2D pos=(1165.883, 961.4847) visible=true
+  visual type=Polygon2D color=(0.95, 0.78, 0.25, 1.0)
+child=@CharacterBody2D@307 class=CharacterBody2D pos=(1024.916, 1027.566) visible=true
+  visual type=Polygon2D color=(0.25, 0.45, 0.55, 1.0)
+child=@CharacterBody2D@308 class=CharacterBody2D pos=(1254.466, 692.0905) visible=true
+  visual type=Polygon2D color=(0.55, 0.2, 0.25, 1.0)
+child=@CharacterBody2D@309 class=CharacterBody2D pos=(1306.655, 659.1753) visible=true
+  visual type=Polygon2D color=(0.95, 0.78, 0.25, 1.0)
+child=@CharacterBody2D@311 class=CharacterBody2D pos=(1241.715, 596.4573) visible=true
+  visual type=Polygon2D color=(0.55, 0.2, 0.25, 1.0)
+child=@CharacterBody2D@312 class=CharacterBody2D pos=(1272.655, 585.6384) visible=true
+  visual type=Polygon2D color=(0.75, 0.45, 0.15, 1.0)
+child=@CharacterBody2D@313 class=CharacterBody2D pos=(1381.105, 601.6946) visible=true
+  visual type=Polygon2D color=(0.75, 0.45, 0.15, 1.0)
+child=@CharacterBody2D@314 class=CharacterBody2D pos=(1359.471, 629.4024) visible=true
+  visual type=Polygon2D color=(0.35, 0.3, 0.45, 1.0)
+child=@CharacterBody2D@315 class=CharacterBody2D pos=(1584.824, 510.7905) visible=true
+  visual type=Polygon2D color=(0.35, 0.3, 0.45, 1.0)
+child=@CharacterBody2D@316 class=CharacterBody2D pos=(1441.555, 538.5352) visible=true
+  visual type=Polygon2D color=(0.25, 0.45, 0.55, 1.0)
+child=@CharacterBody2D@317 class=CharacterBody2D pos=(1503.076, 430.6461) visible=true
+  visual type=Polygon2D color=(0.55, 0.2, 0.25, 1.0)
+child=@CharacterBody2D@318 class=CharacterBody2D pos=(1568.529, 519.1549) visible=true
+  visual type=Polygon2D color=(0.55, 0.2, 0.25, 1.0)
+child=@CharacterBody2D@319 class=CharacterBody2D pos=(1459.825, 493.5737) visible=true
+  visual type=Polygon2D color=(0.55, 0.2, 0.25, 1.0)
+child=@CharacterBody2D@320 class=CharacterBody2D pos=(1537.085, 509.9476) visible=true
+  visual type=Polygon2D color=(0.75, 0.45, 0.15, 1.0)
+child=@CharacterBody2D@321 class=CharacterBody2D pos=(1784.052, 1040.325) visible=true
+  visual type=Polygon2D color=(0.75, 0.45, 0.15, 1.0)
+child=@CharacterBody2D@322 class=CharacterBody2D pos=(1688.882, 1048.06) visible=true
+  visual type=Polygon2D color=(0.95, 0.78, 0.25, 1.0)
+child=@CharacterBody2D@324 class=CharacterBody2D pos=(1791.515, 935.585) visible=true
+  visual type=Polygon2D color=(0.25, 0.45, 0.55, 1.0)
+child=@CharacterBody2D@325 class=CharacterBody2D pos=(1708.887, 975.4037) visible=true
+  visual type=Polygon2D color=(0.25, 0.45, 0.55, 1.0)
+child=@CharacterBody2D@326 class=CharacterBody2D pos=(1714.118, 938.722) visible=true
+  visual type=Polygon2D color=(0.55, 0.2, 0.25, 1.0)
+child=@CharacterBody2D@327 class=CharacterBody2D pos=(1801.947, 1049.934) visible=true
+  visual type=Polygon2D color=(0.55, 0.2, 0.25, 1.0)
+child=@CharacterBody2D@328 class=CharacterBody2D pos=(1972.848, 521.856) visible=true
+  visual type=Polygon2D color=(0.55, 0.2, 0.25, 1.0)
+child=@CharacterBody2D@329 class=CharacterBody2D pos=(1869.532, 484.259) visible=true
+  visual type=Polygon2D color=(0.95, 0.78, 0.25, 1.0)
 zone=0
-alive=5
-player_var=Player:<CharacterBody2D#35332818459>
-wave=Окрайна деревни | Пачка 1/2
+alive=44
+player_var=Player:<CharacterBody2D#37480302146>
+wave=Окрайна деревни | осталось: 44
 floor type=Polygon2D color=(0.32, 0.38, 0.22, 1.0) visible=true

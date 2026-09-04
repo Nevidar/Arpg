@@ -52,6 +52,7 @@ func _ready() -> void:
 	_visual.color = body_color
 	_attack_area.monitoring = false
 	_splash_area.monitoring = false
+	_camera.zoom = Vector2(0.72, 0.72)
 	hp_changed.emit(stats.hp, stats.max_hp)
 	progress_changed.emit()
 	inventory_changed.emit()
@@ -113,6 +114,15 @@ func _physics_process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and not inventory_open:
+		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
+			var z := clampf(_camera.zoom.x * 1.08, 0.45, 1.2)
+			_camera.zoom = Vector2(z, z)
+			get_viewport().set_input_as_handled()
+		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			var z2 := clampf(_camera.zoom.x * 0.92, 0.45, 1.2)
+			_camera.zoom = Vector2(z2, z2)
+			get_viewport().set_input_as_handled()
 	if event is InputEventKey and event.pressed and not event.echo:
 		var code: int = event.keycode
 		if code >= KEY_F1 and code <= KEY_F8 and not inventory_open:
@@ -167,6 +177,7 @@ func _do_splash() -> void:
 	_resolve_hits(_splash_area, 6.0, 0.25)
 	_splash_area.monitoring = false
 	shake(4.0, 0.1)
+	Sfx.play_splash()
 
 
 func _do_ground_slam() -> void:
@@ -182,6 +193,7 @@ func _do_ground_slam() -> void:
 	_resolve_hits(_splash_area, 14.0, 0.4)
 	_splash_area.monitoring = false
 	shake(8.0, 0.18)
+	Sfx.play_slam()
 
 
 func _resolve_hits(area: Area2D, skill_base: float, skill_more: float) -> void:
@@ -320,26 +332,41 @@ func _update_shake(delta: float) -> void:
 
 func _flash_attack_visual() -> void:
 	var arc := Polygon2D.new()
-	arc.polygon = [Vector2(18, -14), Vector2(60, -14), Vector2(60, 14), Vector2(18, 14)]
-	arc.color = Color(1.0, 0.85, 0.4, 0.7)
+	arc.polygon = [Vector2(18, -16), Vector2(64, -18), Vector2(64, 18), Vector2(18, 16)]
+	arc.color = Color(1.0, 0.9, 0.45, 0.85)
+	arc.z_index = 20
 	_attack_area.add_child(arc)
-	get_tree().create_timer(0.1).timeout.connect(arc.queue_free)
+	var tw := get_tree().create_tween()
+	tw.tween_property(arc, "modulate:a", 0.0, 0.14)
+	tw.tween_callback(arc.queue_free)
 
 
 func _flash_splash_visual() -> void:
 	var blob := Polygon2D.new()
-	blob.polygon = [Vector2(-35, -35), Vector2(35, -35), Vector2(35, 35), Vector2(-35, 35)]
-	blob.color = Color(0.9, 0.45, 0.2, 0.55)
+	blob.polygon = [Vector2(-40, -40), Vector2(40, -40), Vector2(40, 40), Vector2(-40, 40)]
+	blob.color = Color(1.0, 0.5, 0.2, 0.7)
+	blob.z_index = 20
 	_splash_area.add_child(blob)
-	get_tree().create_timer(0.12).timeout.connect(blob.queue_free)
+	var tw := get_tree().create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(blob, "scale", Vector2(1.35, 1.35), 0.16)
+	tw.tween_property(blob, "modulate:a", 0.0, 0.16)
+	tw.set_parallel(false)
+	tw.tween_callback(blob.queue_free)
 
 
 func _flash_slam_visual() -> void:
 	var ring := Polygon2D.new()
-	ring.polygon = [Vector2(-45, -45), Vector2(45, -45), Vector2(45, 45), Vector2(-45, 45)]
-	ring.color = Color(0.7, 0.35, 0.15, 0.65)
+	ring.polygon = [Vector2(-52, -52), Vector2(52, -52), Vector2(52, 52), Vector2(-52, 52)]
+	ring.color = Color(0.85, 0.4, 0.15, 0.75)
+	ring.z_index = 20
 	_splash_area.add_child(ring)
-	get_tree().create_timer(0.15).timeout.connect(ring.queue_free)
+	var tw := get_tree().create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(ring, "scale", Vector2(1.6, 1.6), 0.2)
+	tw.tween_property(ring, "modulate:a", 0.0, 0.2)
+	tw.set_parallel(false)
+	tw.tween_callback(ring.queue_free)
 
 
 func _spawn_hit_spark(pos: Vector2, crit: bool) -> void:

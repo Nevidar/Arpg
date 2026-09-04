@@ -19,7 +19,7 @@ var prefixes: Array[ItemAffix] = []
 var suffixes: Array[ItemAffix] = []
 var grid_w: int = 1
 var grid_h: int = 1
-## Для свитков: transmute / augment / alchemy
+## Для свитков: transmute / augment / alchemy / regal / scour
 var craft_id: StringName = &""
 ## Для карт эндгейма
 var map_id: StringName = &""
@@ -42,6 +42,9 @@ static func create_base(slot: Slot, base_name: String, base_damage: float = 0.0,
 
 
 static func roll_loot(ilvl: int = 1) -> ItemData:
+	# Джекпот: уникал (~2%)
+	if randf() < 0.02:
+		return make_unique_weapon()
 	# Иногда свиток крафта
 	if randf() < 0.18:
 		return roll_scroll()
@@ -80,11 +83,15 @@ static func roll_loot(ilvl: int = 1) -> ItemData:
 
 static func roll_scroll() -> ItemData:
 	var roll := randf()
-	if roll < 0.45:
+	if roll < 0.35:
 		return make_scroll(&"transmute", "Свиток заговора", "Обычный → магический")
-	if roll < 0.8:
+	if roll < 0.60:
 		return make_scroll(&"augment", "Свиток уз", "Добавляет аффикс магическому")
-	return make_scroll(&"alchemy", "Свиток алхимии", "Обычный/маг. → редкий")
+	if roll < 0.80:
+		return make_scroll(&"alchemy", "Свиток алхимии", "Обычный/маг. → редкий")
+	if roll < 0.90:
+		return make_scroll(&"regal", "Свиток регала", "Магический → редкий (+1 аффикс)")
+	return make_scroll(&"scour", "Свиток очищения", "Маг./редкий → обычный")
 
 
 static func make_scroll(craft: StringName, name: String, _hint: String) -> ItemData:
@@ -93,6 +100,19 @@ static func make_scroll(craft: StringName, name: String, _hint: String) -> ItemD
 	item.identified = true
 	item.color = Color(0.55, 0.35, 0.85)
 	item.display_name = name
+	return item
+
+
+static func make_unique_weapon() -> ItemData:
+	var item := create_base(Slot.WEAPON, "Секира Велеса", 52.0, 0.0)
+	item.rarity = Rarity.UNIQUE
+	item.identified = true
+	item.color = Color(1.0, 0.55, 0.12) # оранжевый уник
+	item.display_name = "Секира Велеса"
+	item.prefixes.clear()
+	item.suffixes.clear()
+	item.grid_w = 2
+	item.grid_h = 3
 	return item
 
 
@@ -176,6 +196,9 @@ func identify() -> bool:
 
 
 func _rebuild_name() -> void:
+	if rarity == Rarity.UNIQUE:
+		display_name = base_name
+		return
 	var pref := ""
 	var suf := ""
 	if not prefixes.is_empty():
@@ -327,6 +350,10 @@ func is_map() -> bool:
 	return map_id != &""
 
 
+func is_unique() -> bool:
+	return rarity == Rarity.UNIQUE
+
+
 func craft_hint() -> String:
 	match String(craft_id):
 		"transmute":
@@ -335,5 +362,9 @@ func craft_hint() -> String:
 			return "Магический: добавить преф или суфф"
 		"alchemy":
 			return "Обычный/маг. → редкий"
+		"regal":
+			return "Магический → редкий (+1 аффикс)"
+		"scour":
+			return "Маг./редкий → обычный (смыть аффиксы)"
 		_:
 			return ""
