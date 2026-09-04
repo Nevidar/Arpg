@@ -20,6 +20,7 @@ var _equip_buttons: Dictionary = {}
 var _hint: Label
 var _last_lmb_ms: int = 0
 var _last_lmb_item: ItemData = null
+var _craft_target: ItemData = null
 
 
 func setup(p: CharacterBody2D) -> void:
@@ -109,7 +110,7 @@ func _build() -> void:
 	_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_hint.custom_minimum_size = Vector2(270, 100)
 	_hint.add_theme_font_size_override("font_size", 12)
-	_hint.text = "ЛКМ — выбрать / перенос\nДвойной ЛКМ — надеть\nПКМ — опознать\nПКМ по слоту — снять\nI / Tab / Esc — закрыть"
+	_hint.text = "ЛКМ — выбрать / перенос\nДвойной ЛКМ — надеть\nПКМ по шмоту — опознать\nПКМ по свитку — крафт на выбранный\nПКМ по слоту — снять\nI / Tab / Esc — закрыть"
 	doll_col.add_child(_hint)
 
 	# --- Bag ---
@@ -237,8 +238,32 @@ func _on_item_input(ev: InputEvent, entry: Dictionary) -> void:
 		return
 	var item: ItemData = entry["item"]
 	if ev.button_index == MOUSE_BUTTON_RIGHT:
-		# ПКМ = опознать
 		_selected_bag = entry
+		# Свиток крафта: ПКМ применяет к выбранному ранее шмоту
+		if item.is_currency():
+			var target: ItemData = null
+			# если ранее выбран другой предмет — он цель; иначе ищем другой selected через drag
+			# цель: любой другой выбранный gear — храним _craft_target
+			if _craft_target != null and _craft_target != item:
+				target = _craft_target
+			elif _drag_entry.get("item", null) != null and _drag_entry["item"] != item and not (_drag_entry["item"] as ItemData).is_currency():
+				target = _drag_entry["item"]
+			if target == null:
+				_spawn_float("Сначала ЛКМ по шмоту, потом ПКМ по свитку")
+				_refresh_tooltip()
+				refresh()
+				return
+			var msg := Crafting.apply_scroll(item, target)
+			if msg in ["Заговор наложен", "Узы добавлены", "Алхимия свершилась"]:
+				player.inventory.remove_item(item)
+				Sfx.play_level_up()
+			_spawn_float(msg)
+			_selected_bag = {}
+			_craft_target = target
+			refresh()
+			_refresh_tooltip_item(target)
+			return
+		# Обычный предмет: ПКМ = опознать
 		if not item.identified:
 			if player.inventory.identify_item(item):
 				Sfx.play_pickup()
@@ -256,8 +281,10 @@ func _on_item_input(ev: InputEvent, entry: Dictionary) -> void:
 		_last_lmb_item = item
 		_selected_bag = entry
 		_drag_entry = entry
+		if not item.is_currency():
+			_craft_target = item
 		_refresh_tooltip()
-		if is_double and item.identified:
+		if is_double and item.identified and not item.is_currency():
 			player.inventory.equip_from_bag(entry)
 			_selected_bag = {}
 			_drag_entry = {}
@@ -312,8 +339,7 @@ func _on_equip_slot_clicked(slot: ItemData.Slot, right: bool) -> void:
 
 
 func _spawn_float(text: String) -> void:
-	# лёгкий отклик в тултипе
-	_hint.text = text + "\n\nЛКМ — выбрать / перенос\nДвойной ЛКМ — надеть\nПКМ — опознать\nПКМ по слоту — снять\nI / Tab / Esc — закрыть"
+	_hint.text = text + "\n\nЛКМ — выбрать / перенос\nДвойной ЛКМ — надеть\nПКМ по шмоту — опознать\nЛКМ шмот → ПКМ свиток — крафт\nПКМ по слоту — снять\nI / Tab / Esc — закрыть"
 
 
 func _refresh_tooltip() -> void:

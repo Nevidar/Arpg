@@ -1,7 +1,7 @@
 class_name ItemData
 extends RefCounted
 
-enum Slot { WEAPON, HELMET, BODY, GLOVES, BOOTS, SHIELD, RING, AMULET, BACK }
+enum Slot { WEAPON, HELMET, BODY, GLOVES, BOOTS, SHIELD, RING, AMULET, BACK, CURRENCY }
 enum Rarity { NORMAL, MAGIC, RARE, UNIQUE }
 
 var id: StringName = &""
@@ -17,6 +17,8 @@ var prefixes: Array[ItemAffix] = []
 var suffixes: Array[ItemAffix] = []
 var grid_w: int = 1
 var grid_h: int = 1
+## Для свитков: transmute / augment / alchemy
+var craft_id: StringName = &""
 
 
 static func create_base(slot: Slot, base_name: String, base_damage: float = 0.0, base_armor: float = 0.0) -> ItemData:
@@ -35,6 +37,10 @@ static func create_base(slot: Slot, base_name: String, base_damage: float = 0.0,
 
 
 static func roll_loot(ilvl: int = 1) -> ItemData:
+	# Иногда свиток крафта
+	if randf() < 0.18:
+		return roll_scroll()
+
 	var slot_roll := randf()
 	var item: ItemData
 	if slot_roll < 0.32:
@@ -64,6 +70,24 @@ static func roll_loot(ilvl: int = 1) -> ItemData:
 		item.rarity = Rarity.NORMAL
 
 	item._apply_rarity_affixes()
+	return item
+
+
+static func roll_scroll() -> ItemData:
+	var roll := randf()
+	if roll < 0.45:
+		return make_scroll(&"transmute", "Свиток заговора", "Обычный → магический")
+	if roll < 0.8:
+		return make_scroll(&"augment", "Свиток уз", "Добавляет аффикс магическому")
+	return make_scroll(&"alchemy", "Свиток алхимии", "Обычный/маг. → редкий")
+
+
+static func make_scroll(craft: StringName, name: String, _hint: String) -> ItemData:
+	var item := create_base(Slot.CURRENCY, name, 0.0, 0.0)
+	item.craft_id = craft
+	item.identified = true
+	item.color = Color(0.55, 0.35, 0.85)
+	item.display_name = name
 	return item
 
 
@@ -174,6 +198,11 @@ func slot_label() -> String:
 
 func tooltip_lines() -> PackedStringArray:
 	var lines: PackedStringArray = []
+	if is_currency():
+		lines.append("%s [свиток]" % display_name)
+		lines.append(craft_hint())
+		lines.append("Выбери шмот, ПКМ по свитку")
+		return lines
 	lines.append("%s [%s/%s]" % [display_name, rarity_label(), slot_label()])
 	if not identified:
 		lines.append("Не опознан — ПКМ")
@@ -232,6 +261,9 @@ func _set_grid_size() -> void:
 		Slot.BACK:
 			grid_w = 2
 			grid_h = 2
+		Slot.CURRENCY:
+			grid_w = 1
+			grid_h = 1
 		_:
 			grid_w = 1
 			grid_h = 1
@@ -253,5 +285,27 @@ func short_label() -> String:
 			return "F"
 		Slot.SHIELD:
 			return "S"
+		Slot.RING:
+			return "R"
+		Slot.AMULET:
+			return "A"
+		Slot.CURRENCY:
+			return "※"
 		_:
 			return "·"
+
+
+func is_currency() -> bool:
+	return slot == Slot.CURRENCY
+
+
+func craft_hint() -> String:
+	match String(craft_id):
+		"transmute":
+			return "Обычный → магический (1 аффикс)"
+		"augment":
+			return "Магический: добавить преф или суфф"
+		"alchemy":
+			return "Обычный/маг. → редкий"
+		_:
+			return ""

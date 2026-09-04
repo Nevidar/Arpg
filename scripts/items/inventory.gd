@@ -126,6 +126,15 @@ func identify_first() -> bool:
 	return false
 
 
+func remove_item(item: ItemData) -> bool:
+	for i in range(bag.size() - 1, -1, -1):
+		if bag[i]["item"] == item:
+			bag.remove_at(i)
+			changed.emit()
+			return true
+	return false
+
+
 func occupied_map(ignore: ItemData = null) -> Dictionary:
 	var map := {}
 	for e in bag:

@@ -144,6 +144,18 @@ func xp_reward() -> int:
 			return 10
 
 
+func gold_reward() -> int:
+	match kind:
+		EnemyKind.TANK:
+			return randi_range(8, 18)
+		EnemyKind.RANGED:
+			return randi_range(4, 10)
+		EnemyKind.FAST:
+			return randi_range(3, 8)
+		_:
+			return randi_range(2, 6)
+
+
 func roll_drop() -> ItemData:
 	if randf() < 0.42:
 		return null

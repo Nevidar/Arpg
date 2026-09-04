@@ -4,6 +4,7 @@ signal hp_changed(current: float, maximum: float)
 signal died
 signal progress_changed
 signal inventory_changed
+signal gold_changed(amount: int)
 
 @export var body_color: Color = Color(0.75, 0.55, 0.35)
 
@@ -13,6 +14,7 @@ var inventory: Inventory = Inventory.new()
 var passives: PassiveTree = PassiveTree.new()
 var life_leech: float = 0.0
 var inventory_open: bool = false
+var gold: int = 0
 
 var _dash_time: float = 0.0
 var _dash_cooldown: float = 0.0
@@ -226,6 +228,13 @@ func apply_damage(hit: Damage) -> void:
 
 func gain_xp(amount: int) -> void:
 	progress.add_xp(amount)
+
+
+func add_gold(amount: int) -> void:
+	gold += amount
+	gold_changed.emit(gold)
+	if amount > 0:
+		_spawn_float_text("+%d золота" % amount, Color(1.0, 0.85, 0.3))
 
 
 func try_pickup(item: ItemData) -> bool:
