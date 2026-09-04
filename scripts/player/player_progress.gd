@@ -12,6 +12,7 @@ var xp: int = 0
 var strength: float = 10.0
 var dexterity: float = 6.0
 var intelligence: float = 3.0
+var passive_points_on_level: int = 1
 
 
 func xp_to_next() -> int:

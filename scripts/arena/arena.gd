@@ -10,6 +10,7 @@ const ENEMY_SCENE := preload("res://scenes/enemy.tscn")
 @onready var _wave_label: Label = $HUD/Root/WaveLabel
 @onready var _stats_label: Label = $HUD/Root/StatsLabel
 @onready var _inv_label: Label = $HUD/Root/InvLabel
+@onready var _passive_label: Label = $HUD/Root/PassiveLabel
 
 var player: CharacterBody2D
 var _wave: int = 1
@@ -18,7 +19,7 @@ var _loot_nodes: Array[Node2D] = []
 
 
 func _ready() -> void:
-	_hint_label.text = "WASD ход | ЛКМ удар | Q сплеш | E удар по земле (ур.4) | Пробел рывок | 1-9 экип | R рестарт"
+	_hint_label.text = "WASD | ЛКМ удар | Q сплеш | E slam(ур4) | Пробел рывок | 1-9 экип | I опознать | F1-F8 пассивки | R рестарт"
 	_spawn_player()
 	_spawn_wave()
 
@@ -40,9 +41,11 @@ func _spawn_player() -> void:
 	player.died.connect(_on_player_died)
 	player.progress_changed.connect(_refresh_stats)
 	player.inventory_changed.connect(_refresh_inv)
+	player.passives.changed.connect(_refresh_passives)
 	_on_player_hp(player.stats.hp, player.stats.max_hp)
 	_refresh_stats()
 	_refresh_inv()
+	_refresh_passives()
 
 
 func _on_player_hp(current: float, maximum: float) -> void:
@@ -64,6 +67,10 @@ func _refresh_stats() -> void:
 
 func _refresh_inv() -> void:
 	_inv_label.text = "\n".join(player.inventory.summary_lines())
+
+
+func _refresh_passives() -> void:
+	_passive_label.text = "\n".join(player.passives.summary_lines())
 
 
 func _spawn_wave() -> void:

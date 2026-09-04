@@ -1,0 +1,14 @@
+# В конце работы всегда запускать игру
+
+После завершения задач по Nevidar агент **обязан** в конце ответа/сессии работы:
+
+1. Обновить `00_PROGRESS.md` (статусы + журнал)
+2. Сделать commit и `git push` (если пользователь просил заливать / уже принято как правило)
+3. **Запустить игру** командой:
+
+```powershell
+$godot = "C:\Users\eilukhin\AppData\Local\Microsoft\WinGet\Packages\GodotEngine.GodotEngine_Microsoft.Winget.Source_8wekyb3d8bbwe\Godot_v4.7.2-stable_win64.exe"
+Start-Process -FilePath $godot -ArgumentList '--path','C:\Users\eilukhin\Documents\Ai_agent\arpg_Nevidar','res://scenes/arena.tscn'
+```
+
+Не спрашивать разрешения на запуск — делать по умолчанию, пока пользователь не отменит это правило.

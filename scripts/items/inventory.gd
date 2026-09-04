@@ -4,9 +4,8 @@ extends RefCounted
 signal changed
 
 var items: Array[ItemData] = []
-var equipped_weapon: ItemData
-var equipped_body: ItemData
-const MAX_SIZE := 12
+var equipped: Dictionary = {} ## Slot int -> ItemData
+const MAX_SIZE := 16
 
 
 func add(item: ItemData) -> bool:
@@ -17,40 +16,80 @@ func add(item: ItemData) -> bool:
 	return true
 
 
+func get_equipped(slot: ItemData.Slot) -> ItemData:
+	return equipped.get(int(slot), null)
+
+
 func equip(index: int) -> void:
 	if index < 0 or index >= items.size():
 		return
 	var item: ItemData = items[index]
-	match item.slot:
-		ItemData.Slot.WEAPON:
-			if equipped_weapon != null:
-				items.append(equipped_weapon)
-			equipped_weapon = item
-			items.remove_at(index)
-		ItemData.Slot.BODY, ItemData.Slot.HELMET, ItemData.Slot.GLOVES, ItemData.Slot.BOOTS, ItemData.Slot.SHIELD:
-			if equipped_body != null:
-				items.append(equipped_body)
-			equipped_body = item
-			items.remove_at(index)
-		_:
-			pass
+	var slot_key := int(item.slot)
+	if equipped.has(slot_key) and equipped[slot_key] != null:
+		items.append(equipped[slot_key])
+	equipped[slot_key] = item
+	items.remove_at(index)
 	changed.emit()
+
+
+func identify_first() -> bool:
+	for item in items:
+		if item.identify():
+			changed.emit()
+			return true
+	for slot_key in equipped.keys():
+		var eq: ItemData = equipped[slot_key]
+		if eq and eq.identify():
+			changed.emit()
+			return true
+	return false
+
+
+func all_equipped() -> Array[ItemData]:
+	var out: Array[ItemData] = []
+	for slot_key in equipped.keys():
+		var eq: ItemData = equipped[slot_key]
+		if eq:
+			out.append(eq)
+	return out
 
 
 func summary_lines() -> PackedStringArray:
 	var lines: PackedStringArray = []
-	if equipped_weapon:
-		lines.append("Оружие: %s (%s)" % [equipped_weapon.display_name, equipped_weapon.rarity_label()])
-	else:
-		lines.append("Оружие: кулаки")
-	if equipped_body:
-		lines.append("Броня: %s (%s)" % [equipped_body.display_name, equipped_body.rarity_label()])
-	else:
-		lines.append("Броня: нет")
-	lines.append("--- инвентарь (1-9 экип) ---")
+	var order := [
+		ItemData.Slot.WEAPON, ItemData.Slot.SHIELD, ItemData.Slot.HELMET,
+		ItemData.Slot.BODY, ItemData.Slot.GLOVES, ItemData.Slot.BOOTS
+	]
+	for slot in order:
+		var eq := get_equipped(slot)
+		var label := _slot_name(slot)
+		if eq:
+			lines.append("%s: %s (%s)" % [label, eq.display_name, eq.rarity_label()])
+		else:
+			lines.append("%s: —" % label)
+	lines.append("--- сумка (1-9 экип, I опознать) ---")
 	for i in mini(items.size(), 9):
 		var it: ItemData = items[i]
-		lines.append("%d) %s [%s]" % [i + 1, it.display_name, it.rarity_label()])
+		var mark := "?" if not it.identified else it.rarity_label()
+		lines.append("%d) %s [%s]" % [i + 1, it.display_name, mark])
 	if items.is_empty():
 		lines.append("(пусто)")
 	return lines
+
+
+func _slot_name(slot: ItemData.Slot) -> String:
+	match slot:
+		ItemData.Slot.WEAPON:
+			return "Оружие"
+		ItemData.Slot.SHIELD:
+			return "Щит"
+		ItemData.Slot.HELMET:
+			return "Шлем"
+		ItemData.Slot.BODY:
+			return "Тело"
+		ItemData.Slot.GLOVES:
+			return "Перчатки"
+		ItemData.Slot.BOOTS:
+			return "Сапоги"
+		_:
+			return "Слот"

@@ -145,19 +145,9 @@ func xp_reward() -> int:
 
 
 func roll_drop() -> ItemData:
-	var roll := randf()
-	if roll < 0.45:
+	if randf() < 0.42:
 		return null
-	var rarity := ItemData.Rarity.NORMAL
-	if roll > 0.92:
-		rarity = ItemData.Rarity.RARE
-	elif roll > 0.75:
-		rarity = ItemData.Rarity.MAGIC
-	if randf() < 0.65:
-		var names := ["Меч", "Топор", "Двуручный топор", "Молот"]
-		var dmg := 10.0 + float(rarity) * 4.0 + randf_range(0.0, 3.0)
-		return ItemData.make_weapon(names[randi() % names.size()], dmg, rarity)
-	return ItemData.make_armor("Нагрудник", 5.0 + float(rarity) * 4.0, 10.0 + float(rarity) * 8.0, rarity)
+	return ItemData.roll_loot(1 + int(stats.max_hp / 40.0))
 
 
 func apply_damage(hit: Damage) -> void:

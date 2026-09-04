@@ -87,6 +87,15 @@ offset_bottom = 260.0
 theme_override_font_sizes/font_size = 13
 text = "Инвентарь"
 
+[node name="PassiveLabel" type="Label" parent="HUD/Root"]
+layout_mode = 0
+offset_left = 900.0
+offset_top = 270.0
+offset_right = 1260.0
+offset_bottom = 520.0
+theme_override_font_sizes/font_size = 12
+text = "Пассивки"
+
 [node name="HintLabel" type="Label" parent="HUD/Root"]
 layout_mode = 0
 offset_left = 16.0

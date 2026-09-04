@@ -10,6 +10,8 @@ signal inventory_changed
 var stats: CombatStats = CombatStats.new()
 var progress: PlayerProgress = PlayerProgress.new()
 var inventory: Inventory = Inventory.new()
+var passives: PassiveTree = PassiveTree.new()
+var life_leech: float = 0.0
 
 var _dash_time: float = 0.0
 var _dash_cooldown: float = 0.0
@@ -35,8 +37,13 @@ func _ready() -> void:
 		_recompute_from_gear()
 		inventory_changed.emit()
 	)
+	passives.changed.connect(func() -> void:
+		_recompute_from_gear()
+		progress_changed.emit()
+	)
 	progress.leveled_up.connect(_on_leveled_up)
 	progress.xp_changed.connect(func(_a, _b, _c) -> void: progress_changed.emit())
+	passives.add_point(1) # стартовое очко
 	_recompute_from_gear()
 	stats.heal_full()
 	_visual.color = body_color
@@ -102,6 +109,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		var code: int = event.keycode
 		if code >= KEY_1 and code <= KEY_9:
 			inventory.equip(code - KEY_1)
+		elif code == KEY_I:
+			if inventory.identify_first():
+				Sfx.play_pickup()
+				_spawn_float_text("Опознано", Color(0.5, 0.8, 1.0))
+		elif code >= KEY_F1 and code <= KEY_F8:
+			if passives.try_buy(code - KEY_F1):
+				Sfx.play_level_up()
+				_spawn_float_text("Пассивка!", Color(0.7, 0.9, 0.4))
 
 
 func _start_dash() -> void:
@@ -170,6 +185,7 @@ func _do_ground_slam() -> void:
 func _resolve_hits(area: Area2D, skill_base: float, skill_more: float) -> void:
 	var any := false
 	var any_crit := false
+	var dealt := 0.0
 	for body in area.get_overlapping_bodies():
 		if body.has_method("apply_damage"):
 			var hit := Damage.roll_attack(stats, body.stats, skill_base, skill_more, 0.0, _facing)
@@ -177,7 +193,11 @@ func _resolve_hits(area: Area2D, skill_base: float, skill_more: float) -> void:
 			if hit.amount > 0.0:
 				any = true
 				any_crit = any_crit or hit.is_crit
+				dealt += hit.amount
 				_spawn_hit_spark(body.global_position, hit.is_crit)
+	if dealt > 0.0 and life_leech > 0.0 and stats.is_alive():
+		stats.hp = minf(stats.max_hp, stats.hp + dealt * life_leech)
+		hp_changed.emit(stats.hp, stats.max_hp)
 	if any:
 		Sfx.play_hit(any_crit)
 		shake(6.0 if any_crit else 3.0, 0.12 if any_crit else 0.08)
@@ -219,36 +239,54 @@ func try_pickup(item: ItemData) -> bool:
 func _recompute_from_gear() -> void:
 	var hp_ratio: float = 1.0 if stats.max_hp <= 0.0 else stats.hp / stats.max_hp
 	var weapon_dmg: float = _unarmed_damage
-	var inc: float = 0.15 + progress.strength * 0.01
-	var armor: float = 0.0
-	var bonus_hp: float = progress.strength * 2.0
+	var inc: float = 0.15 + progress.strength * 0.01 + passives.get_bonus(&"inc_damage")
+	var armor: float = passives.get_bonus(&"armor")
+	var bonus_hp: float = progress.strength * 2.0 + passives.get_bonus(&"hp")
+	var more_list: Array[float] = []
+	var bag: Dictionary = {}
+	life_leech = passives.get_bonus(&"leech")
 
-	if inventory.equipped_weapon:
-		weapon_dmg = inventory.equipped_weapon.base_damage
-		inc += inventory.equipped_weapon.increased_damage
-		bonus_hp += inventory.equipped_weapon.added_hp
-	if inventory.equipped_body:
-		armor += inventory.equipped_body.added_armor
-		bonus_hp += inventory.equipped_body.added_hp
+	var weapon := inventory.get_equipped(ItemData.Slot.WEAPON)
+	if weapon:
+		weapon_dmg = weapon.base_damage
+		weapon.accumulate_into(bag)
+
+	for eq in inventory.all_equipped():
+		if eq.slot != ItemData.Slot.WEAPON:
+			armor += eq.base_armor
+			eq.accumulate_into(bag)
+
+	inc += float(bag.get(int(AffixDef.Stat.INCREASED_DAMAGE), 0.0))
+	weapon_dmg += float(bag.get(int(AffixDef.Stat.FLAT_DAMAGE), 0.0))
+	bonus_hp += float(bag.get(int(AffixDef.Stat.FLAT_HP), 0.0))
+	armor += float(bag.get(int(AffixDef.Stat.FLAT_ARMOR), 0.0))
+	life_leech += float(bag.get(int(AffixDef.Stat.LIFE_LEECH), 0.0))
 
 	stats.base_damage = weapon_dmg
 	stats.added_damage = progress.strength * 0.4
 	stats.increased_damage = inc
+	stats.more_multipliers = more_list
 	stats.armor = armor
-	stats.crit_chance = 0.08 + progress.dexterity * 0.004
-	stats.crit_multi = 1.5
-	stats.move_speed = 190.0 + progress.dexterity * 1.5
-	stats.max_mana = 30.0 + progress.intelligence * 2.0
+	stats.crit_chance = 0.08 + progress.dexterity * 0.004 + passives.get_bonus(&"crit") + float(bag.get(int(AffixDef.Stat.CRIT_CHANCE), 0.0))
+	stats.crit_multi = 1.5 + passives.get_bonus(&"crit_multi") + float(bag.get(int(AffixDef.Stat.CRIT_MULTI), 0.0))
+	stats.move_speed = 190.0 + progress.dexterity * 1.5 + passives.get_bonus(&"move") + float(bag.get(int(AffixDef.Stat.MOVE_SPEED), 0.0)) * 100.0
+	stats.max_mana = 30.0 + progress.intelligence * 2.0 + passives.get_bonus(&"mana") + float(bag.get(int(AffixDef.Stat.MANA), 0.0))
 	stats.max_hp = 100.0 + bonus_hp
 	stats.hp = clampf(stats.max_hp * hp_ratio, 1.0, stats.max_hp)
 	stats.mana = minf(stats.mana, stats.max_mana)
-	stats.resist_physical = 0.05
-	stats.attack_speed = 1.0 + progress.dexterity * 0.01
+	stats.block_chance = float(bag.get(int(AffixDef.Stat.BLOCK_CHANCE), 0.0))
+	stats.resist_physical = 0.05 + float(bag.get(int(AffixDef.Stat.RESIST_PHYS), 0.0))
+	stats.resist_fire = float(bag.get(int(AffixDef.Stat.RESIST_FIRE), 0.0))
+	stats.resist_cold = float(bag.get(int(AffixDef.Stat.RESIST_COLD), 0.0))
+	stats.resist_lightning = float(bag.get(int(AffixDef.Stat.RESIST_LIGHTNING), 0.0))
+	stats.resist_chaos = float(bag.get(int(AffixDef.Stat.RESIST_CHAOS), 0.0))
+	stats.attack_speed = 1.0 + progress.dexterity * 0.01 + float(bag.get(int(AffixDef.Stat.ATTACK_SPEED), 0.0))
 	hp_changed.emit(stats.hp, stats.max_hp)
 	progress_changed.emit()
 
 
 func _on_leveled_up(new_level: int) -> void:
+	passives.add_point(progress.passive_points_on_level)
 	_recompute_from_gear()
 	stats.hp = stats.max_hp
 	Sfx.play_level_up()
