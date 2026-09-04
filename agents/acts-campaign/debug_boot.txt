@@ -1,0 +1,29 @@
+scene=Arena:<Node2D#34678506969>
+script_ok=true
+world=World:<Node2D#34728838643>
+world_n=14
+child=Player class=CharacterBody2D pos=(639.9929, 360.2243) visible=true
+  visual type=Polygon2D color=(0.75, 0.55, 0.35, 1.0)
+child=@Polygon2D@235 class=Polygon2D pos=(220.0, 200.0) visible=true
+child=@Polygon2D@236 class=Polygon2D pos=(980.0, 180.0) visible=true
+child=@Polygon2D@237 class=Polygon2D pos=(240.0, 520.0) visible=true
+child=@Polygon2D@238 class=Polygon2D pos=(1000.0, 500.0) visible=true
+child=@Polygon2D@239 class=Polygon2D pos=(640.0, 160.0) visible=true
+child=@Polygon2D@240 class=Polygon2D pos=(640.0, 560.0) visible=true
+child=@Polygon2D@241 class=Polygon2D pos=(400.0, 360.0) visible=true
+child=@Polygon2D@242 class=Polygon2D pos=(880.0, 360.0) visible=true
+child=Enemy class=CharacterBody2D pos=(217.4327, 146.7713) visible=true
+  visual type=Polygon2D color=(0.55, 0.2, 0.25, 1.0)
+child=@CharacterBody2D@244 class=CharacterBody2D pos=(1062.937, 160.3828) visible=true
+  visual type=Polygon2D color=(0.55, 0.2, 0.25, 1.0)
+child=@CharacterBody2D@245 class=CharacterBody2D pos=(248.7521, 539.2571) visible=true
+  visual type=Polygon2D color=(0.75, 0.45, 0.15, 1.0)
+child=@CharacterBody2D@246 class=CharacterBody2D pos=(1082.886, 563.0445) visible=true
+  visual type=Polygon2D color=(0.35, 0.3, 0.45, 1.0)
+child=@CharacterBody2D@247 class=CharacterBody2D pos=(647.8078, 115.3745) visible=true
+  visual type=Polygon2D color=(0.25, 0.45, 0.55, 1.0)
+zone=0
+alive=5
+player_var=Player:<CharacterBody2D#35332818459>
+wave=Окрайна деревни | Пачка 1/2
+floor type=Polygon2D color=(0.32, 0.38, 0.22, 1.0) visible=true

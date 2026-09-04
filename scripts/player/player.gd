@@ -28,7 +28,7 @@ var _shake_time: float = 0.0
 var _shake_power: float = 0.0
 var _unarmed_damage: float = 8.0
 
-@onready var _visual: ColorRect = $Visual
+@onready var _visual: Polygon2D = $Visual
 @onready var _attack_area: Area2D = $AttackArc
 @onready var _attack_shape: CollisionShape2D = $AttackArc/CollisionShape2D
 @onready var _splash_area: Area2D = $SplashArea
@@ -319,37 +319,35 @@ func _update_shake(delta: float) -> void:
 
 
 func _flash_attack_visual() -> void:
-	var arc := ColorRect.new()
-	arc.size = Vector2(42, 28)
-	arc.position = Vector2(18, -14)
+	var arc := Polygon2D.new()
+	arc.polygon = [Vector2(18, -14), Vector2(60, -14), Vector2(60, 14), Vector2(18, 14)]
 	arc.color = Color(1.0, 0.85, 0.4, 0.7)
 	_attack_area.add_child(arc)
 	get_tree().create_timer(0.1).timeout.connect(arc.queue_free)
 
 
 func _flash_splash_visual() -> void:
-	var blob := ColorRect.new()
-	blob.size = Vector2(70, 70)
-	blob.position = Vector2(-35, -35)
+	var blob := Polygon2D.new()
+	blob.polygon = [Vector2(-35, -35), Vector2(35, -35), Vector2(35, 35), Vector2(-35, 35)]
 	blob.color = Color(0.9, 0.45, 0.2, 0.55)
 	_splash_area.add_child(blob)
 	get_tree().create_timer(0.12).timeout.connect(blob.queue_free)
 
 
 func _flash_slam_visual() -> void:
-	var ring := ColorRect.new()
-	ring.size = Vector2(90, 90)
-	ring.position = Vector2(-45, -45)
+	var ring := Polygon2D.new()
+	ring.polygon = [Vector2(-45, -45), Vector2(45, -45), Vector2(45, 45), Vector2(-45, 45)]
 	ring.color = Color(0.7, 0.35, 0.15, 0.65)
 	_splash_area.add_child(ring)
 	get_tree().create_timer(0.15).timeout.connect(ring.queue_free)
 
 
 func _spawn_hit_spark(pos: Vector2, crit: bool) -> void:
-	var spark := ColorRect.new()
-	spark.size = Vector2(10, 10) if not crit else Vector2(16, 16)
+	var half := 5.0 if not crit else 8.0
+	var spark := Polygon2D.new()
+	spark.polygon = [Vector2(-half, -half), Vector2(half, -half), Vector2(half, half), Vector2(-half, half)]
 	spark.color = Color(1.0, 0.95, 0.5, 0.9) if not crit else Color(1.0, 0.6, 0.2, 1.0)
-	spark.global_position = pos + Vector2(-5, -5)
+	spark.global_position = pos
 	spark.z_index = 90
 	get_tree().current_scene.add_child(spark)
 	var tween := get_tree().create_tween()

@@ -13,9 +13,9 @@ var _attack_cd: float = 0.0
 var _hit_flash: float = 0.0
 var _body_color: Color = Color(0.55, 0.2, 0.25)
 
-@onready var _visual: ColorRect = $Visual
-@onready var _hp_bar: ColorRect = $HpBar
-@onready var _hp_bg: ColorRect = $HpBarBg
+@onready var _visual: Polygon2D = $Visual
+@onready var _hp_bar: Polygon2D = $HpBar
+@onready var _hp_bg: Polygon2D = $HpBarBg
 
 
 func _ready() -> void:
@@ -125,9 +125,9 @@ func _melee_attack(dir: Vector2) -> void:
 func _ranged_attack(dir: Vector2) -> void:
 	_attack_cd = 1.2
 	# Простой «снаряд»-точка: мгновенный хит с задержкой ощущения
-	var marker := ColorRect.new()
-	marker.size = Vector2(10, 10)
+	var marker := Polygon2D.new()
 	marker.color = Color(0.4, 0.8, 1.0, 0.9)
+	marker.polygon = [Vector2(-5, -5), Vector2(5, -5), Vector2(5, 5), Vector2(-5, 5)]
 	marker.global_position = global_position
 	get_tree().current_scene.add_child(marker)
 	var target_pos := player.global_position
@@ -198,4 +198,5 @@ func apply_damage(hit: Damage) -> void:
 
 func _update_hp_bar() -> void:
 	var ratio := clampf(stats.hp / stats.max_hp, 0.0, 1.0)
-	_hp_bar.size.x = 28.0 * ratio
+	var w := 28.0 * ratio
+	_hp_bar.polygon = [Vector2(-14, -22), Vector2(-14 + w, -22), Vector2(-14 + w, -17), Vector2(-14, -17)]

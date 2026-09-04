@@ -53,6 +53,7 @@
 
 | Дата | Что | Где |
 |------|-----|-----|
+| 2026-09-04 | Фикс «только надписи»: preload Campaign + Polygon2D мир | arena / player / enemy / campaign |
 | 2026-09-04 | Кампания Акты 1–5 + F9 skip | `campaign.gd`, `arena.gd` |
 | 2026-09-04 | Фикс цифр урона; босс Акта 1; купец | `floating_text.gd`, `enemy.gd`, `arena.gd` |
 | 2026-09-04 | Акт 1 зоны + золото + свитки | arena / crafting |

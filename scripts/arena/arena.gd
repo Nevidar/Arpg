@@ -4,6 +4,7 @@ extends Node2D
 
 const PLAYER_SCENE := preload("res://scenes/player.tscn")
 const ENEMY_SCENE := preload("res://scenes/enemy.tscn")
+const CampaignData := preload("res://scripts/world/campaign.gd")
 
 @onready var _world: Node2D = $World
 @onready var _spawn_points: Node2D = $SpawnPoints
@@ -14,8 +15,8 @@ const ENEMY_SCENE := preload("res://scenes/enemy.tscn")
 @onready var _stats_label: Label = $HUD/Root/StatsLabel
 @onready var _inv_label: Label = $HUD/Root/InvLabel
 @onready var _passive_label: Label = $HUD/Root/PassiveLabel
-@onready var _floor: ColorRect = $Floor
-@onready var _background: ColorRect = $Background
+@onready var _floor: Polygon2D = $Floor
+@onready var _background: Polygon2D = $Background
 
 var _zones: Array = []
 var player: CharacterBody2D
@@ -33,7 +34,7 @@ var _merchant: Node2D
 
 
 func _ready() -> void:
-	_zones = Campaign.zones()
+	_zones = CampaignData.zones()
 	_hint_label.text = "WASD бой | I инвентарь | Q/E навыки | Пробел рывок | F1-F8 пассивки | N/G портал | F9 следующая зона | R рестарт"
 	_ensure_extra_labels()
 	_spawn_player()
@@ -126,12 +127,13 @@ func _enter_zone(index: int) -> void:
 	_zone_clear = false
 	_clear_world_props()
 	var z: Dictionary = _current_zone()
-	_act_label.text = Campaign.act_title(int(z["act"]))
+	_act_label.text = CampaignData.act_title(int(z["act"]))
 	_wave_label.text = "%s | Пачка %d/%d" % [z["name"], _pack, z["packs"]]
 	_flavor_label.text = z["flavor"]
 	_background.color = z["bg"]
 	_floor.color = z["floor"]
-	FloatingText.spawn(self, Vector2(640, 280), Campaign.act_title(int(z["act"])), Color(0.9, 0.8, 0.5), true)
+	_spawn_zone_decor(z)
+	FloatingText.spawn(self, Vector2(640, 280), CampaignData.act_title(int(z["act"])), Color(0.9, 0.8, 0.5), true)
 	_spawn_pack()
 
 
@@ -139,12 +141,48 @@ func _clear_world_props() -> void:
 	for n in _world.get_children():
 		if n == player:
 			continue
-		if n.is_in_group("enemies") or n.has_meta("portal") or n.has_meta("merchant") or n.has_meta("item") or n.has_meta("gold"):
+		if n.is_in_group("enemies") or n.has_meta("portal") or n.has_meta("merchant") or n.has_meta("item") or n.has_meta("gold") or n.has_meta("decor"):
 			n.queue_free()
 	_loot_nodes.clear()
 	_alive_enemies = 0
 	_portal = null
 	_merchant = null
+
+
+func _spawn_zone_decor(z: Dictionary) -> void:
+	var act: int = int(z["act"])
+	var accent := Color(0.45, 0.55, 0.3)
+	match act:
+		2:
+			accent = Color(0.25, 0.55, 0.55)
+		3:
+			accent = Color(0.65, 0.35, 0.25)
+		4:
+			accent = Color(0.7, 0.55, 0.2)
+		5:
+			accent = Color(0.45, 0.55, 0.85)
+	var spots := [
+		Vector2(220, 200), Vector2(980, 180), Vector2(240, 520),
+		Vector2(1000, 500), Vector2(640, 160), Vector2(640, 560),
+		Vector2(400, 360), Vector2(880, 360),
+	]
+	for i in spots.size():
+		var p := Polygon2D.new()
+		p.set_meta("decor", true)
+		p.z_index = -5
+		p.color = accent.darkened(0.15 + 0.05 * float(i % 3))
+		var s := 18.0 + float(i % 4) * 6.0
+		if act == 1 or act == 4:
+			# «деревья / идолы»
+			p.polygon = [Vector2(0, -s), Vector2(s * 0.55, s * 0.4), Vector2(-s * 0.55, s * 0.4)]
+		elif act == 2 or act == 5:
+			# «лужи / льдины»
+			p.polygon = [Vector2(-s, 0), Vector2(-s * 0.3, -s * 0.45), Vector2(s * 0.7, -s * 0.2), Vector2(s, s * 0.2), Vector2(-s * 0.4, s * 0.35)]
+		else:
+			# «дома / стены»
+			p.polygon = [Vector2(-s, -s), Vector2(s, -s), Vector2(s, s), Vector2(-s, s)]
+		p.global_position = spots[i]
+		_world.add_child(p)
 
 
 func _on_player_hp(current: float, maximum: float) -> void:
@@ -289,10 +327,9 @@ func _spawn_merchant(pos: Vector2) -> void:
 	_merchant = Node2D.new()
 	_merchant.global_position = pos
 	_merchant.set_meta("merchant", true)
-	var body := ColorRect.new()
-	body.size = Vector2(28, 36)
-	body.position = Vector2(-14, -18)
-	body.color = Color(0.55, 0.4, 0.25)
+	var body := Polygon2D.new()
+	body.polygon = [Vector2(-14, -18), Vector2(14, -18), Vector2(14, 18), Vector2(-14, 18)]
+	body.color = Color(0.75, 0.55, 0.3)
 	_merchant.add_child(body)
 	var lab := Label.new()
 	lab.text = "Купец\nE: свиток 30з"
@@ -337,10 +374,9 @@ func _spawn_portal(pos: Vector2, label_text: String = "ПОРТАЛ") -> void:
 	circle.radius = 36.0
 	shape.shape = circle
 	_portal.add_child(shape)
-	var vis := ColorRect.new()
-	vis.size = Vector2(52, 52)
-	vis.position = Vector2(-26, -26)
-	vis.color = Color(0.35, 0.75, 0.9, 0.8)
+	var vis := Polygon2D.new()
+	vis.polygon = [Vector2(-26, -26), Vector2(26, -26), Vector2(26, 26), Vector2(-26, 26)]
+	vis.color = Color(0.35, 0.75, 0.9, 0.85)
 	_portal.add_child(vis)
 	var lab := Label.new()
 	lab.text = label_text
@@ -367,9 +403,8 @@ func _spawn_loot(pos: Vector2, item: ItemData) -> void:
 	var node := Node2D.new()
 	node.global_position = pos
 	node.set_meta("item", item)
-	var visual := ColorRect.new()
-	visual.size = Vector2(14, 14)
-	visual.position = Vector2(-7, -7)
+	var visual := Polygon2D.new()
+	visual.polygon = [Vector2(-7, -7), Vector2(7, -7), Vector2(7, 7), Vector2(-7, 7)]
 	visual.color = item.color
 	node.add_child(visual)
 	var label := Label.new()
@@ -386,9 +421,8 @@ func _spawn_gold_pile(pos: Vector2, amount: int) -> void:
 	var node := Node2D.new()
 	node.global_position = pos + Vector2(randf_range(-12, 12), randf_range(-12, 12))
 	node.set_meta("gold", amount)
-	var visual := ColorRect.new()
-	visual.size = Vector2(10, 10)
-	visual.position = Vector2(-5, -5)
+	var visual := Polygon2D.new()
+	visual.polygon = [Vector2(-5, -5), Vector2(5, -5), Vector2(5, 5), Vector2(-5, 5)]
 	visual.color = Color(0.95, 0.8, 0.2)
 	node.add_child(visual)
 	_world.add_child(node)
