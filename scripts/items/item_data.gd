@@ -37,19 +37,23 @@ static func create_base(slot: Slot, base_name: String, base_damage: float = 0.0,
 static func roll_loot(ilvl: int = 1) -> ItemData:
 	var slot_roll := randf()
 	var item: ItemData
-	if slot_roll < 0.35:
+	if slot_roll < 0.32:
 		var names := ["Меч", "Топор", "Двуручный топор", "Молот"]
 		item = create_base(Slot.WEAPON, names[randi() % names.size()], 10.0 + ilvl * 0.8 + randf_range(0, 3))
-	elif slot_roll < 0.5:
+	elif slot_roll < 0.46:
 		item = create_base(Slot.BODY, "Нагрудник", 0.0, 6.0 + ilvl * 0.5)
-	elif slot_roll < 0.62:
+	elif slot_roll < 0.56:
 		item = create_base(Slot.HELMET, "Шлем", 0.0, 3.0 + ilvl * 0.3)
-	elif slot_roll < 0.74:
+	elif slot_roll < 0.66:
 		item = create_base(Slot.GLOVES, "Перчатки", 0.0, 2.0 + ilvl * 0.25)
-	elif slot_roll < 0.86:
+	elif slot_roll < 0.76:
 		item = create_base(Slot.BOOTS, "Сапоги", 0.0, 2.0 + ilvl * 0.25)
-	else:
+	elif slot_roll < 0.86:
 		item = create_base(Slot.SHIELD, "Щит", 0.0, 8.0 + ilvl * 0.6)
+	elif slot_roll < 0.93:
+		item = create_base(Slot.RING, "Кольцо", 0.0, 0.0)
+	else:
+		item = create_base(Slot.AMULET, "Амулет", 0.0, 0.0)
 
 	var r := randf()
 	if r > 0.93:
@@ -172,7 +176,7 @@ func tooltip_lines() -> PackedStringArray:
 	var lines: PackedStringArray = []
 	lines.append("%s [%s/%s]" % [display_name, rarity_label(), slot_label()])
 	if not identified:
-		lines.append("Не опознан — кнопка в инвентаре")
+		lines.append("Не опознан — ПКМ")
 		return lines
 	if base_damage > 0.0:
 		lines.append("Баз. урон: %.0f" % base_damage)

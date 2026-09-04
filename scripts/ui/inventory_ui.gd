@@ -1,11 +1,14 @@
 class_name InventoryUI
 extends Control
 
-## UI инвентаря: paper doll (Diablo/HS) + сетка (PoE/D2) + тултип.
+## Инвентарь: paper doll как в PoE + сетка сумки + тултип.
+## ПКМ по предмету = опознать.
 
 signal closed
 
 const CELL := 36
+const SLOT_W := 68
+const SLOT_H := 68
 
 var player: CharacterBody2D
 var _selected_bag: Dictionary = {}
@@ -15,6 +18,8 @@ var _grid_host: Control
 var _tooltip: RichTextLabel
 var _equip_buttons: Dictionary = {}
 var _hint: Label
+var _last_lmb_ms: int = 0
+var _last_lmb_item: ItemData = null
 
 
 func setup(p: CharacterBody2D) -> void:
@@ -49,8 +54,8 @@ func _build() -> void:
 	)
 
 	_panel = PanelContainer.new()
-	_panel.position = Vector2(180, 70)
-	_panel.custom_minimum_size = Vector2(920, 560)
+	_panel.position = Vector2(140, 50)
+	_panel.custom_minimum_size = Vector2(980, 580)
 	add_child(_panel)
 
 	var margin := MarginContainer.new()
@@ -61,42 +66,53 @@ func _build() -> void:
 	_panel.add_child(margin)
 
 	var root := HBoxContainer.new()
-	root.add_theme_constant_override("separation", 16)
+	root.add_theme_constant_override("separation", 18)
 	margin.add_child(root)
 
-	var doll := VBoxContainer.new()
-	doll.custom_minimum_size = Vector2(220, 0)
-	root.add_child(doll)
+	# --- PoE-like paper doll ---
+	var doll_col := VBoxContainer.new()
+	doll_col.custom_minimum_size = Vector2(280, 0)
+	root.add_child(doll_col)
+
 	var title := Label.new()
-	title.text = "Экипировка"
+	title.text = "Персонаж"
 	title.add_theme_font_size_override("font_size", 18)
-	doll.add_child(title)
+	doll_col.add_child(title)
 
-	var grid_doll := GridContainer.new()
-	grid_doll.columns = 3
-	grid_doll.add_theme_constant_override("h_separation", 8)
-	grid_doll.add_theme_constant_override("v_separation", 8)
-	doll.add_child(grid_doll)
+	var doll := Control.new()
+	doll.custom_minimum_size = Vector2(270, 340)
+	doll_col.add_child(doll)
 
-	_add_equip_slot(grid_doll, ItemData.Slot.HELMET, "Шлем")
-	_add_equip_slot(grid_doll, ItemData.Slot.WEAPON, "Оружие")
-	_add_equip_slot(grid_doll, ItemData.Slot.SHIELD, "Щит")
-	_add_equip_slot(grid_doll, ItemData.Slot.BODY, "Тело")
-	_add_equip_slot(grid_doll, ItemData.Slot.GLOVES, "Перчатки")
-	_add_equip_slot(grid_doll, ItemData.Slot.BOOTS, "Сапоги")
+	# Силуэт по центру (подсказка формы тела)
+	var silhouette := ColorRect.new()
+	silhouette.position = Vector2(102, 90)
+	silhouette.size = Vector2(66, 150)
+	silhouette.color = Color(0.18, 0.17, 0.22, 0.9)
+	silhouette.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	doll.add_child(silhouette)
 
-	var id_btn := Button.new()
-	id_btn.text = "Опознать (I)"
-	id_btn.pressed.connect(_on_identify_pressed)
-	doll.add_child(id_btn)
+	# Раскладка как в PoE:
+	#        [Шлем]
+	# [Оружие][Тело][Щит]
+	# [Кольцо]      [Амулет]
+	# [Перчатки]    [Сапоги]
+	_place_slot(doll, ItemData.Slot.HELMET, "Шлем", Vector2(101, 8), Vector2(68, 56))
+	_place_slot(doll, ItemData.Slot.WEAPON, "Оружие", Vector2(12, 72), Vector2(72, 110))
+	_place_slot(doll, ItemData.Slot.BODY, "Броня", Vector2(101, 72), Vector2(68, 110))
+	_place_slot(doll, ItemData.Slot.SHIELD, "Щит", Vector2(186, 72), Vector2(72, 110))
+	_place_slot(doll, ItemData.Slot.RING, "Кольцо", Vector2(22, 196), Vector2(52, 52))
+	_place_slot(doll, ItemData.Slot.AMULET, "Амулет", Vector2(196, 196), Vector2(52, 52))
+	_place_slot(doll, ItemData.Slot.GLOVES, "Перчатки", Vector2(12, 260), Vector2(72, 64))
+	_place_slot(doll, ItemData.Slot.BOOTS, "Сапоги", Vector2(186, 260), Vector2(72, 64))
 
 	_hint = Label.new()
 	_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_hint.custom_minimum_size = Vector2(210, 90)
+	_hint.custom_minimum_size = Vector2(270, 100)
 	_hint.add_theme_font_size_override("font_size", 12)
-	_hint.text = "ЛКМ выбрать\nПКМ экип/снять\nКлик по клетке = перенос\nTab/I/Esc закрыть"
-	doll.add_child(_hint)
+	_hint.text = "ЛКМ — выбрать / перенос\nДвойной ЛКМ — надеть\nПКМ — опознать\nПКМ по слоту — снять\nI / Tab / Esc — закрыть"
+	doll_col.add_child(_hint)
 
+	# --- Bag ---
 	var bag_col := VBoxContainer.new()
 	root.add_child(bag_col)
 	var bag_title := Label.new()
@@ -108,6 +124,7 @@ func _build() -> void:
 	_grid_host.custom_minimum_size = Vector2(Inventory.COLS * CELL + 4, Inventory.ROWS * CELL + 4)
 	bag_col.add_child(_grid_host)
 
+	# --- Tooltip ---
 	var tip_col := VBoxContainer.new()
 	tip_col.custom_minimum_size = Vector2(260, 0)
 	root.add_child(tip_col)
@@ -123,23 +140,32 @@ func _build() -> void:
 	tip_col.add_child(_tooltip)
 
 
-func _add_equip_slot(parent: GridContainer, slot: ItemData.Slot, label: String) -> void:
-	var box := VBoxContainer.new()
+func _place_slot(parent: Control, slot: ItemData.Slot, label: String, pos: Vector2, size: Vector2) -> void:
+	var box := Control.new()
+	box.position = pos
+	box.size = size + Vector2(0, 16)
+	parent.add_child(box)
+
 	var name_l := Label.new()
 	name_l.text = label
+	name_l.position = Vector2(0, 0)
+	name_l.size = Vector2(size.x, 14)
 	name_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	name_l.add_theme_font_size_override("font_size", 11)
+	name_l.add_theme_font_size_override("font_size", 10)
+	name_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(name_l)
+
 	var btn := Button.new()
-	btn.custom_minimum_size = Vector2(64, 64)
+	btn.position = Vector2(0, 14)
+	btn.size = size
 	btn.clip_text = true
+	btn.add_theme_font_size_override("font_size", 11)
 	btn.pressed.connect(func() -> void: _on_equip_slot_clicked(slot, false))
 	btn.gui_input.connect(func(ev: InputEvent) -> void:
 		if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_RIGHT:
 			_on_equip_slot_clicked(slot, true)
 	)
 	box.add_child(btn)
-	parent.add_child(box)
 	_equip_buttons[int(slot)] = btn
 
 
@@ -156,12 +182,15 @@ func _refresh_equip_slots() -> void:
 		var btn: Button = _equip_buttons[slot_key]
 		var eq: ItemData = player.inventory.get_equipped(slot_key)
 		if eq:
-			btn.text = eq.short_label() + "\n" + eq.display_name.substr(0, 8)
+			var shown: String = eq.display_name
+			if shown.length() > 10:
+				shown = shown.substr(0, 9) + "…"
+			btn.text = "%s\n%s" % [eq.short_label(), shown]
 			btn.modulate = eq.color
 			btn.tooltip_text = "\n".join(eq.tooltip_lines())
 		else:
 			btn.text = "—"
-			btn.modulate = Color(1, 1, 1)
+			btn.modulate = Color(0.85, 0.85, 0.9)
 			btn.tooltip_text = ""
 
 
@@ -192,7 +221,7 @@ func _rebuild_grid() -> void:
 		rect.color = Color(item.color.lightened(0.2), 1.0) if selected else Color(item.color, 0.88)
 		rect.mouse_filter = Control.MOUSE_FILTER_STOP
 		var lab := Label.new()
-		lab.text = item.short_label()
+		lab.text = "?" if not item.identified else item.short_label()
 		lab.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		lab.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		lab.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -204,27 +233,44 @@ func _rebuild_grid() -> void:
 
 
 func _on_item_input(ev: InputEvent, entry: Dictionary) -> void:
-	if ev is InputEventMouseButton and ev.pressed:
-		if ev.button_index == MOUSE_BUTTON_LEFT:
-			_selected_bag = entry
-			_drag_entry = entry
-			_refresh_tooltip()
-			_rebuild_grid()
-		elif ev.button_index == MOUSE_BUTTON_RIGHT:
+	if not (ev is InputEventMouseButton and ev.pressed):
+		return
+	var item: ItemData = entry["item"]
+	if ev.button_index == MOUSE_BUTTON_RIGHT:
+		# ПКМ = опознать
+		_selected_bag = entry
+		if not item.identified:
+			if player.inventory.identify_item(item):
+				Sfx.play_pickup()
+				_spawn_float("Опознано")
+		else:
+			_spawn_float("Уже опознан")
+		_refresh_tooltip()
+		refresh()
+		return
+
+	if ev.button_index == MOUSE_BUTTON_LEFT:
+		var now := Time.get_ticks_msec()
+		var is_double := _last_lmb_item == item and (now - _last_lmb_ms) < 350
+		_last_lmb_ms = now
+		_last_lmb_item = item
+		_selected_bag = entry
+		_drag_entry = entry
+		_refresh_tooltip()
+		if is_double and item.identified:
 			player.inventory.equip_from_bag(entry)
 			_selected_bag = {}
+			_drag_entry = {}
 			Sfx.play_pickup()
-			refresh()
+			_spawn_float("Надето")
+		_rebuild_grid()
 
 
 func _on_cell_input(ev: InputEvent, x: int, y: int) -> void:
 	if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
 		var under: Dictionary = player.inventory.get_bag_entry_at(x, y)
 		if not under.is_empty():
-			_selected_bag = under
-			_drag_entry = under
-			_refresh_tooltip()
-			_rebuild_grid()
+			_on_item_input(ev, under)
 			return
 		if not _drag_entry.is_empty():
 			if player.inventory.move_bag_item(_drag_entry, x, y):
@@ -236,32 +282,38 @@ func _on_cell_input(ev: InputEvent, x: int, y: int) -> void:
 
 func _on_equip_slot_clicked(slot: ItemData.Slot, right: bool) -> void:
 	var eq: ItemData = player.inventory.get_equipped(slot)
-	if eq:
-		_refresh_tooltip_item(eq)
-		if right:
+	if right:
+		# ПКМ по слоту: опознать надетое, иначе снять
+		if eq and not eq.identified:
+			if player.inventory.identify_item(eq):
+				Sfx.play_pickup()
+				_spawn_float("Опознано")
+				refresh()
+			return
+		if eq:
 			if player.inventory.unequip_slot(slot):
 				Sfx.play_pickup()
 				refresh()
 		return
+
+	if eq:
+		_refresh_tooltip_item(eq)
+		return
 	if not _selected_bag.is_empty():
 		var item: ItemData = _selected_bag["item"]
 		if item.slot == slot:
+			if not item.identified:
+				_spawn_float("Сначала опознай (ПКМ)")
+				return
 			player.inventory.equip_from_bag(_selected_bag)
 			_selected_bag = {}
 			Sfx.play_pickup()
 			refresh()
 
 
-func _on_identify_pressed() -> void:
-	if not _selected_bag.is_empty():
-		var item: ItemData = _selected_bag["item"]
-		if player.inventory.identify_item(item):
-			Sfx.play_pickup()
-			refresh()
-			return
-	if player.inventory.identify_first():
-		Sfx.play_pickup()
-		refresh()
+func _spawn_float(text: String) -> void:
+	# лёгкий отклик в тултипе
+	_hint.text = text + "\n\nЛКМ — выбрать / перенос\nДвойной ЛКМ — надеть\nПКМ — опознать\nПКМ по слоту — снять\nI / Tab / Esc — закрыть"
 
 
 func _refresh_tooltip() -> void:
@@ -279,6 +331,8 @@ func _refresh_tooltip_item(item: ItemData) -> void:
 		bb += lines[i] + "\n"
 	if item.identified:
 		bb += "\n[i]%dx%d клеток[/i]" % [item.grid_w, item.grid_h]
+	else:
+		bb += "\n[color=#88aaff]ПКМ — опознать[/color]"
 	_tooltip.text = bb
 
 
