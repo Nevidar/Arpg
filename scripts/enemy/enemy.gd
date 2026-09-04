@@ -12,6 +12,7 @@ var player: Node2D
 var _attack_cd: float = 0.0
 var _hit_flash: float = 0.0
 var _body_color: Color = Color(0.55, 0.2, 0.25)
+var _aggroed: bool = false
 
 @onready var _visual: Polygon2D = $Visual
 @onready var _hp_bar: Polygon2D = $HpBar
@@ -92,6 +93,22 @@ func _physics_process(delta: float) -> void:
 	var to_player := player.global_position - global_position
 	var dist := to_player.length()
 	var dir := to_player.normalized() if dist > 0.001 else Vector2.RIGHT
+
+	# На большой карте не бегут всей толпой с другого края.
+	const AGGRO := 420.0
+	const DEAGGRO := 560.0
+	if not _aggroed:
+		if dist <= AGGRO:
+			_aggroed = true
+		else:
+			velocity = Vector2.ZERO
+			move_and_slide()
+			return
+	elif dist > DEAGGRO:
+		_aggroed = false
+		velocity = Vector2.ZERO
+		move_and_slide()
+		return
 
 	match kind:
 		EnemyKind.RANGED:

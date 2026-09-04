@@ -51,11 +51,12 @@ static func act_title(act: int) -> String:
 
 
 static func _z(act: int, name: String, ilvl: int, packs: int, boss: bool, boss_name: String, flavor: String, bg: Color, floor_c: Color) -> Dictionary:
+	# packs оставлен для совместимости; зона спавнится целиком (~40–50 врагов).
 	return {
 		"act": act,
 		"name": name,
 		"ilvl": ilvl,
-		"packs": packs,
+		"packs": 1,
 		"boss": boss,
 		"boss_name": boss_name,
 		"flavor": flavor,
