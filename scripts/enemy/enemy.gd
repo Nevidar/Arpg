@@ -16,6 +16,7 @@ var _aggroed: bool = false
 var is_champion: bool = false
 var is_rare: bool = false
 var _aura: Polygon2D
+var _boss_enraged: bool = false
 
 @onready var _visual: Polygon2D = $Visual
 @onready var _hp_bar: Polygon2D = $HpBar
@@ -175,7 +176,7 @@ func _physics_process(delta: float) -> void:
 
 
 func _melee_attack(dir: Vector2) -> void:
-	_attack_cd = 0.9
+	attack_cd = 0.68 if _boss_enraged else 0.9
 	var telegraph := _spawn_melee_telegraph(dir)
 	await get_tree().create_timer(0.22).timeout
 	if is_instance_valid(telegraph):
@@ -288,6 +289,8 @@ func apply_damage(hit: Damage) -> void:
 
 	stats.take_raw_hp(hit.amount)
 	_hit_flash = 0.1
+	if kind == EnemyKind.BOSS and not _boss_enraged and stats.hp <= stats.max_hp * 0.5:
+		_enter_boss_enrage()
 	if hit.knockback != Vector2.ZERO:
 		global_position += hit.knockback * 0.35
 	FloatingText.spawn(self, global_position, str(int(round(hit.amount))), Color(1.0, 0.9, 0.3), hit.is_crit)
@@ -295,6 +298,16 @@ func apply_damage(hit: Damage) -> void:
 	if not stats.is_alive():
 		died.emit(self)
 		queue_free()
+
+
+func _enter_boss_enrage() -> void:
+	_boss_enraged = true
+	stats.move_speed *= 1.2
+	stats.base_damage *= 1.25
+	_body_color = Color(0.78, 0.12, 0.08)
+	_visual.color = _body_color
+	_ensure_aura(Color(1.0, 0.18, 0.08, 0.38), 2.0)
+	FloatingText.spawn(self, global_position, "ЯРОСТЬ!", Color(1.0, 0.35, 0.15), true)
 
 
 func _update_hp_bar() -> void:
