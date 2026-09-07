@@ -138,8 +138,9 @@ func _physics_process(delta: float) -> void:
 	var dir := to_player.normalized() if dist > 0.001 else Vector2.RIGHT
 
 	# На большой карте не бегут всей толпой с другого края.
-	const AGGRO := 360.0
-	const DEAGGRO := 480.0
+	# Пачки создаются по длине большой зоны: радиус должен вовлекать бой раньше.
+	const AGGRO := 720.0
+	const DEAGGRO := 900.0
 	if not _aggroed:
 		if dist <= AGGRO:
 			_aggroed = true

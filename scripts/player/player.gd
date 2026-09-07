@@ -153,6 +153,8 @@ func _update_attack_facing() -> void:
 
 
 func _do_basic_attack() -> void:
+	# Клик должен бить в текущую позицию мыши, а не в направление прошлого кадра.
+	_update_attack_facing()
 	_attack_cooldown = 0.35 / maxf(0.2, stats.attack_speed)
 	_attack_area.monitoring = true
 	_attack_shape.disabled = false
@@ -167,6 +169,7 @@ func _do_basic_attack() -> void:
 func _do_splash() -> void:
 	if stats.mana < 8.0:
 		return
+	_update_attack_facing()
 	stats.mana -= 8.0
 	_skill_cooldown = 1.1
 	_splash_area.monitoring = true
@@ -183,6 +186,7 @@ func _do_splash() -> void:
 func _do_ground_slam() -> void:
 	if stats.mana < 12.0:
 		return
+	_update_attack_facing()
 	stats.mana -= 12.0
 	_slam_cooldown = 1.6
 	_splash_area.monitoring = true
