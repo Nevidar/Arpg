@@ -176,9 +176,30 @@ func _physics_process(delta: float) -> void:
 
 func _melee_attack(dir: Vector2) -> void:
 	_attack_cd = 0.9
-	if player.has_method("apply_damage"):
+	var telegraph := _spawn_melee_telegraph(dir)
+	await get_tree().create_timer(0.22).timeout
+	if is_instance_valid(telegraph):
+		telegraph.queue_free()
+	if is_instance_valid(player) and global_position.distance_to(player.global_position) <= 42.0 and player.has_method("apply_damage"):
 		var hit := Damage.roll_attack(stats, player.stats, 0.0, 0.0, 0.0, dir)
 		player.apply_damage(hit)
+
+
+func _spawn_melee_telegraph(dir: Vector2) -> Polygon2D:
+	# Короткая предупредительная вспышка даёт игроку время прочитать удар и уклониться.
+	var telegraph := Polygon2D.new()
+	telegraph.z_index = -1
+	telegraph.color = Color(1.0, 0.25, 0.16, 0.18)
+	telegraph.polygon = [Vector2(6, -17), Vector2(42, -17), Vector2(42, 17), Vector2(6, 17)]
+	telegraph.rotation = dir.angle()
+	telegraph.scale = Vector2(0.45, 0.45)
+	add_child(telegraph)
+	var tween := create_tween()
+	tween.set_trans(Tween.TRANS_QUAD)
+	tween.set_ease(Tween.EASE_OUT)
+	tween.tween_property(telegraph, "scale", Vector2.ONE, 0.2)
+	tween.parallel().tween_property(telegraph, "color:a", 0.5, 0.14)
+	return telegraph
 
 
 func _ranged_attack(dir: Vector2) -> void:
