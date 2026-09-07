@@ -368,3 +368,79 @@ func craft_hint() -> String:
 			return "Маг./редкий → обычный (смыть аффиксы)"
 		_:
 			return ""
+
+
+func to_save_data() -> Dictionary:
+	return {
+		"id": String(id),
+		"base_name": base_name,
+		"display_name": display_name,
+		"slot": int(slot),
+		"rarity": int(rarity),
+		"base_damage": base_damage,
+		"base_armor": base_armor,
+		"color": [color.r, color.g, color.b, color.a],
+		"identified": identified,
+		"grid_w": grid_w,
+		"grid_h": grid_h,
+		"craft_id": String(craft_id),
+		"map_id": String(map_id),
+		"map_tier": map_tier,
+		"prefixes": _affixes_to_save(prefixes),
+		"suffixes": _affixes_to_save(suffixes),
+	}
+
+
+static func from_save_data(data: Dictionary) -> ItemData:
+	var item := ItemData.new()
+	item.id = StringName(str(data.get("id", "item_%d" % randi())))
+	item.base_name = str(data.get("base_name", "Предмет"))
+	item.display_name = str(data.get("display_name", item.base_name))
+	item.slot = int(data.get("slot", Slot.WEAPON)) as Slot
+	item.rarity = int(data.get("rarity", Rarity.NORMAL)) as Rarity
+	item.base_damage = float(data.get("base_damage", 0.0))
+	item.base_armor = float(data.get("base_armor", 0.0))
+	var saved_color = data.get("color", [])
+	if saved_color is Array and saved_color.size() == 4:
+		item.color = Color(float(saved_color[0]), float(saved_color[1]), float(saved_color[2]), float(saved_color[3]))
+	item.identified = bool(data.get("identified", true))
+	item.grid_w = int(data.get("grid_w", 1))
+	item.grid_h = int(data.get("grid_h", 1))
+	item.craft_id = StringName(str(data.get("craft_id", "")))
+	item.map_id = StringName(str(data.get("map_id", "")))
+	item.map_tier = int(data.get("map_tier", 0))
+	item.prefixes = _affixes_from_save(data.get("prefixes", []))
+	item.suffixes = _affixes_from_save(data.get("suffixes", []))
+	return item
+
+
+static func _affixes_to_save(affixes: Array[ItemAffix]) -> Array:
+	var saved: Array = []
+	for affix in affixes:
+		saved.append({
+			"def_id": String(affix.def_id),
+			"kind": int(affix.kind),
+			"display_name": affix.display_name,
+			"stat": int(affix.stat),
+			"tier": affix.tier,
+			"value": affix.value,
+		})
+	return saved
+
+
+static func _affixes_from_save(saved: Variant) -> Array[ItemAffix]:
+	var affixes: Array[ItemAffix] = []
+	if not saved is Array:
+		return affixes
+	for raw in saved:
+		if not raw is Dictionary:
+			continue
+		var affix := ItemAffix.new()
+		affix.def_id = StringName(str(raw.get("def_id", "")))
+		affix.kind = int(raw.get("kind", AffixDef.Kind.PREFIX)) as AffixDef.Kind
+		affix.display_name = str(raw.get("display_name", "Аффикс"))
+		affix.stat = int(raw.get("stat", AffixDef.Stat.FLAT_DAMAGE)) as AffixDef.Stat
+		affix.tier = int(raw.get("tier", 5))
+		affix.value = float(raw.get("value", 0.0))
+		affixes.append(affix)
+	return affixes

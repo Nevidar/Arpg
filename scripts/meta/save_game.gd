@@ -25,8 +25,7 @@ static func save_player(player: CharacterBody2D, meta: Dictionary = {}) -> bool:
 	cfg.set_value("player", "intelligence", player.progress.intelligence)
 	cfg.set_value("player", "passive_points", player.passives.points)
 	cfg.set_value("player", "passive_ranks", player.passives.ranks.duplicate())
-	# Инвентарь — только id/имена для MVP (без полной сериализации аффиксов)
-	var bag_simple: Array = []
+	var bag_saved: Array = []
 	var seen: Dictionary = {}
 	for e in player.inventory.bag:
 		var it: ItemData = e["item"]
@@ -34,18 +33,16 @@ static func save_player(player: CharacterBody2D, meta: Dictionary = {}) -> bool:
 		if seen.has(iid):
 			continue # анти-дюп: один instance id
 		seen[iid] = true
-		bag_simple.append({
-			"id": iid,
-			"name": it.display_name,
-			"slot": int(it.slot),
-			"map_id": String(it.map_id),
-			"map_tier": it.map_tier,
-			"craft_id": String(it.craft_id),
-			"base_damage": it.base_damage,
-			"rarity": int(it.rarity),
-			"unique": it.is_unique() if it.has_method("is_unique") else false,
-		})
-	cfg.set_value("player", "bag", bag_simple)
+		bag_saved.append({"x": int(e["x"]), "y": int(e["y"]), "item": it.to_save_data()})
+	var equipped_saved: Array = []
+	for equip_slot in player.inventory.equipped:
+		var equipped_item: ItemData = player.inventory.equipped[equip_slot]
+		if equipped_item == null or seen.has(str(equipped_item.id)):
+			continue
+		seen[str(equipped_item.id)] = true
+		equipped_saved.append({"slot": int(equip_slot), "item": equipped_item.to_save_data()})
+	cfg.set_value("player", "bag", bag_saved)
+	cfg.set_value("player", "equipped", equipped_saved)
 	return cfg.save(PATH) == OK
 
 
@@ -66,20 +63,24 @@ static func load_into(player: CharacterBody2D) -> Dictionary:
 	player.passives.changed.emit()
 	player.progress_changed.emit()
 	player.gold_changed.emit(player.gold)
-	# Карты/свитки из сейва — упрощённо восстанавливаем
+	player.inventory.bag.clear()
+	player.inventory.equipped.clear()
 	var bag = cfg.get_value("player", "bag", [])
 	if bag is Array:
 		for entry in bag:
 			if typeof(entry) != TYPE_DICTIONARY:
 				continue
-			var mid := StringName(str(entry.get("map_id", "")))
-			var cid := StringName(str(entry.get("craft_id", "")))
-			if mid != &"":
-				player.try_pickup(ItemData.make_map(mid, str(entry.get("name", "Карта")).replace("Карта: ", "").split(" (")[0], int(entry.get("map_tier", 1))))
-			elif cid != &"":
-				player.try_pickup(ItemData.make_scroll(cid, str(entry.get("name", "Свиток")), ""))
-			elif bool(entry.get("unique", false)):
-				player.try_pickup(ItemData.make_unique_weapon())
+			if entry.has("item") and entry["item"] is Dictionary:
+				var item := ItemData.from_save_data(entry["item"])
+				player.inventory.bag.append({"item": item, "x": int(entry.get("x", 0)), "y": int(entry.get("y", 0))})
+			else:
+				_restore_legacy_item(player, entry)
+	var equipped = cfg.get_value("player", "equipped", [])
+	if equipped is Array:
+		for entry in equipped:
+			if typeof(entry) == TYPE_DICTIONARY and entry.get("item", null) is Dictionary:
+				player.inventory.equipped[int(entry.get("slot", ItemData.Slot.WEAPON))] = ItemData.from_save_data(entry["item"])
+	player.inventory.changed.emit()
 	return {
 		"endgame_unlocked": bool(cfg.get_value("meta", "endgame_unlocked", false)),
 		"atlas": cfg.get_value("meta", "atlas", {}),
@@ -89,3 +90,14 @@ static func load_into(player: CharacterBody2D) -> Dictionary:
 
 static func exists() -> bool:
 	return FileAccess.file_exists(PATH)
+
+
+static func _restore_legacy_item(player: CharacterBody2D, entry: Dictionary) -> void:
+	var mid := StringName(str(entry.get("map_id", "")))
+	var cid := StringName(str(entry.get("craft_id", "")))
+	if mid != &"":
+		player.try_pickup(ItemData.make_map(mid, str(entry.get("name", "Карта")).replace("Карта: ", "").split(" (")[0], int(entry.get("map_tier", 1))))
+	elif cid != &"":
+		player.try_pickup(ItemData.make_scroll(cid, str(entry.get("name", "Свиток")), ""))
+	elif bool(entry.get("unique", false)):
+		player.try_pickup(ItemData.make_unique_weapon())
